@@ -1,0 +1,137 @@
+'use client';
+
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { Crest } from '@/components/Crest';
+import { num, type GameState } from '@/lib/engine';
+import { useCountUp } from '@/lib/hooks';
+import type { School, Team } from '@/lib/types';
+
+/** A bar that drains over `secs`. Remounting the inner bar (key) restarts it. */
+function Meter({ id, k, secs, paused = false, hideWhenIdle = false }: { id: string; k: number; secs: number; paused?: boolean; hideWhenIdle?: boolean }) {
+  return (
+    <div className={'meter' + (hideWhenIdle && !secs ? ' idle' : '')} id={id}>
+      <i key={k} style={secs ? { animation: `drain ${secs}s linear forwards`, animationPlayState: paused ? 'paused' : 'running' } : { animation: 'none' }} />
+    </div>
+  );
+}
+
+/** One side of the scoreboard: crest, score, the four seats, and the +10 / −5 chips that float off it. */
+function TeamPanel({ team, school, score, seat }: { team: Team; school: School; score: number; seat: GameState['seat'] }) {
+  const shown = useCountUp(score);
+  const last = useRef(score);
+  const [bump, setBump] = useState(0);
+  const [chips, setChips] = useState<{ id: number; d: number }[]>([]);
+
+  useEffect(() => {
+    const d = score - last.current;
+    last.current = score;
+    if (!d) return;
+    const id = performance.now() + Math.random();
+    setBump(b => b + 1);
+    setChips(c => [...c, { id, d }]);
+    setTimeout(() => setChips(c => c.filter(x => x.id !== id)), 1250);
+  }, [score]);
+
+  return (
+    <div className={'team ' + team} id={'t-' + team}>
+      <span id={'c-' + team}><Crest school={school} /></span>
+      <div className="meta">
+        <div className="who" id={'n-' + team}>{school.short}</div>
+        <div key={bump} className={'pts' + (bump ? ' hit' : '')} id={'sc-' + team}>{num(shown)}</div>
+        <div className="seats" id={'seats-' + team}>
+          {[0, 1, 2, 3].map(i => <i key={i} className={seat && seat.team === team && seat.idx === i ? 'on' : ''} />)}
+        </div>
+      </div>
+      {chips.map(c => <span key={c.id} className={'chip' + (c.d < 0 ? ' neg' : '')}>{(c.d > 0 ? '+' : '−') + Math.abs(c.d)}</span>)}
+    </div>
+  );
+}
+
+interface Props {
+  active: boolean;
+  s: GameState;
+  boardKey: string;
+  onBuzz: () => void;
+  onAnswer: (text: string) => void;
+}
+
+export function Match({ active, s, boardKey, onBuzz, onAnswer }: Props) {
+  const qtext = useRef<HTMLParagraphElement>(null);
+  const solo = s.mode === 'daily';
+  const cardKey = `${s.qi}-${s.bonusCard ? 'b' : 't'}`;
+  const teamColor = (t: Team) => (t === 'you' ? s.you?.a : s.rival?.a) ?? '#1B1464';
+
+  /* keep the newest word in view on small screens */
+  useEffect(() => { const el = qtext.current; if (el) el.scrollTop = el.scrollHeight; }, [s.words.length]);
+
+  return (
+    <section className="screen match enter" id="s-match" hidden={!active}>
+      <header className={'board' + (solo ? ' solo' : '')} id="board">
+        {s.you && <TeamPanel key={'you' + boardKey} team="you" school={s.you} score={s.scoreYou} seat={s.seat} />}
+        <span className="mid">vs</span>
+        {solo || !s.rival ? (
+          <div className="team rival" id="t-rival">
+            <div className="meta">
+              <div className="who" id="n-rival">Daily challenge</div>
+              <div className="pts" id="sc-rival">{s.dayLabel}</div>
+            </div>
+          </div>
+        ) : (
+          <TeamPanel key={'rival' + boardKey} team="rival" school={s.rival} score={s.scoreRival} seat={s.seat} />
+        )}
+      </header>
+
+      <div className="pips" id="pips" aria-hidden="true">
+        {Array.from({ length: s.total }, (_, i) => <i key={i} className={s.took[i] || (i === s.qi ? 'now' : '')} />)}
+      </div>
+
+      <article className={'card' + (s.bonusCard ? ' bonus' : '')} id="card">
+        <span className="tag" id="tag">{s.tag}</span>
+        <p className="qtext" id="qtext" ref={qtext}>
+          {s.words.map((w, i) => (
+            <span key={`${cardKey}-${i}`} className={'w' + (w.late ? ' late' : '')} style={w.delay ? { animationDelay: w.delay + 'ms' } : undefined}>{w.text}</span>
+          ))}
+        </p>
+        {s.answer && <p className="answer" id="answer">Answer: {s.answer}</p>}
+        {s.stamp && <div key={s.stamp.key} className="stamp" id="stamp" style={{ '--c': teamColor(s.stamp.team) } as CSSProperties}>{s.stamp.text}</div>}
+      </article>
+
+      <p className="status" id="status" role="status" aria-live="polite">{s.status}</p>
+
+      <div className="zone">
+        <div className="z-buzz" id="z-buzz" hidden={s.zone !== 'buzz'}>
+          <Meter id="window" k={s.window.key} secs={s.window.secs} hideWhenIdle />
+          <button
+            className={'dome' + (s.buzzLive ? ' live' : '')} id="buzz" type="button" aria-label="Buzz" disabled={!s.buzzLive}
+            onPointerDown={e => { e.preventDefault(); onBuzz(); }} onClick={onBuzz}
+          >
+            <span className="base" /><span className="cap" id="buzzcap">{s.buzzLive ? 'Buzz' : 'Wait'}</span>
+          </button>
+        </div>
+
+        <div className="z-opts" id="z-opts" hidden={s.zone !== 'opts'}>
+          {s.ask && <>
+            <Meter id="timer" k={s.ask.key} secs={s.ask.secs} paused={s.ask.paused} />
+            <div className="opts" id="opts">
+              {s.ask.options.map((o, i) => (
+                <button key={`${s.ask!.key}-${i}`} type="button" className={'opt' + (o.mark ? ' ' + o.mark : '')} disabled={o.disabled} onClick={() => onAnswer(o.text)}>
+                  <span className="key">{'ABCD'[i]}</span><span className="txt">{o.text}</span>
+                </button>
+              ))}
+            </div>
+          </>}
+        </div>
+
+        <div className="z-rival" id="z-rival" hidden={s.zone !== 'rival'}>
+          {s.rival && s.rivalView && <>
+            <span id="rv-crest"><Crest school={s.rival} /></span>
+            <div className={'bubble' + (s.rivalView.mark ? ' ' + s.rivalView.mark : '')} id="bubble">
+              <small>{s.rivalView.small}</small>
+              {s.rivalView.big ? <span>{s.rivalView.big}</span> : <span className="dots"><i /><i /><i /></span>}
+            </div>
+          </>}
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -1,50 +1,72 @@
-# Quad (working title) — inter-university buzzer quiz prototype
+# Quad (working title) — inter-university buzzer quiz
 
-A playable front-end prototype of a university quiz game in the style of the old pan-African TV quiz shows:
-questions are read out word by word, and the first school to buzz gets to answer.
+A Next.js port of the playable prototype. Questions are read out word by word, and the first school
+to buzz gets to answer. There is no backend yet: the rival is a bot and progress is saved in the browser.
 
 ## Run it
 
-Open `index.html` in a browser. There is no build step and no server.
-It is designed for phones first and also works on desktop (Space to buzz, 1-4 to answer).
-The two web fonts load from Google Fonts, so the type falls back to system fonts when offline.
+```bash
+npm install
+npm run dev      # http://localhost:3000
+```
 
-## What is in it
+`npm run build` then `npm start` runs the production build. Node 20.9 or newer.
 
-- **Match:** pick a school, play eight toss-ups against a rival school from the same country. 10 for a right answer,
-  15 if you buzz before the question ends, -5 for an early miss. A wrong answer gives the other side a steal;
-  a right one earns a bonus question.
-- **Daily challenge:** ten questions, the same for everyone each day (seeded by the UTC date), played once.
-  The earlier you buzz, the more a right answer is worth (10 to 20).
-- **Streak, rating and stats:** kept in the browser's localStorage.
-- **Schools:** 626 universities in 52 African countries, plus "add your school" for anything missing.
-- **Share:** result text copied to the clipboard.
+## Deploy on Vercel
 
-## Files
+Import the repo and Vercel detects Next.js by itself. If the project was first created with the
+"Other" preset (for the static version), change **Framework Preset** to **Next.js** in the project
+settings, and make sure **Root Directory** is the folder that holds `package.json`.
 
-| File | What it holds |
-|---|---|
-| `index.html` | Markup for every screen |
-| `styles.css` | All styling and animation |
-| `js/game.js` | Game logic, crest drawing, synthesized sound, confetti, saved progress |
-| `js/questions.js` | The 40 questions (edit or add here) |
-| `js/universities.js` | Schools grouped by country (edit or add here) |
-| `licenses/` | Licence notice for the university list |
+## Stack
 
-There are no image or audio files. Crests are generated SVG, sound effects are Web Audio oscillators.
+Next.js 16 (App Router), React 19, TypeScript. No UI or state libraries. Styling is one global
+stylesheet. There are no image or audio files: crests are generated SVG and sound is Web Audio.
 
-## What is a placeholder
+## How it is put together
 
-- **The rival is a bot.** There is no multiplayer and no backend. Its behaviour is in `nextQuestion()` and `rivalBuzz()` in `js/game.js`.
-- **The name.** "Quad" is a working title.
-- **Crests and abbreviations.** Crests are invented from each school's name, not real marks. About 70 abbreviations
-  are set by hand; the rest are initials and some clash.
-- **The school list is incomplete** and includes some polytechnics and colleges. It comes from the open
-  Hipo university-domains-list (MIT licence): https://github.com/Hipo/university-domains-list
-- **The questions have not been checked against sources.** Verify them before any public release.
-- **Progress is per browser.** Nothing stops a second device or a restart mid-daily.
+```
+app/
+  layout.tsx          metadata, viewport, font links
+  page.tsx            renders <Game />
+  globals.css         all styling and animation
+components/
+  Game.tsx            client root: owns the engine, routes between screens, keyboard controls
+  Backdrop.tsx        sunburst, confetti canvas, buzz flash
+  Crest.tsx           generated school crest
+  screens/            Menu, Picker, Versus, Match, Result, Stats
+lib/
+  engine.ts           GameEngine: every timer and all match state, no React inside
+  save.ts             saved progress, streak, rating inputs, the daily's seeded question set
+  schools.ts          school lookup, abbreviations, crest colours, rival picking
+  config.ts           game name, round counts, timings
+  sfx.ts, confetti.ts, hooks.ts, types.ts
+  data/questions.ts   the 40 questions
+  data/universities.ts  626 schools in 52 countries
+```
 
-## Planned next (not built)
+`GameEngine` publishes an immutable state snapshot; `Game.tsx` subscribes to it with
+`useSyncExternalStore` and the screens render from that snapshot. Game rules live in the engine,
+so they can be changed or tested without touching components.
 
-Live rooms by invite link, accounts, school leaderboards with weekly seasons, friend challenges,
-a much larger verified question bank, and server-rendered share images.
+## Where the real product plugs in
+
+- **Multiplayer.** The rival is driven by three methods in `lib/engine.ts`: the plan made in
+  `nextQuestion()`, `rivalBuzz()` and `rivalSteal()`. Replace them with events from a room server
+  (the plan was one Cloudflare Durable Object per room) and the rest of the flow stays.
+- **Accounts and leaderboards.** `loadSave()` and `writeSave()` in `lib/save.ts` are the only
+  storage calls. Point them at an API.
+- **Questions.** `lib/data/questions.ts`. First option is the right one; the game shuffles them.
+- **Name.** `GAME_NAME` in `lib/config.ts`.
+
+## What is still a placeholder
+
+- The rival is a bot, and nothing is server-side, so scores can be edited in the browser.
+- "Quad" is a working title.
+- Crests are invented from each school's name, not real marks. About 70 abbreviations are set by
+  hand; the rest are initials and some clash.
+- The school list is incomplete and includes some polytechnics and colleges. It comes from the open
+  Hipo university-domains-list (MIT, notice in `licenses/`): https://github.com/Hipo/university-domains-list
+- The questions have not been checked against sources. Verify them before any public release.
+- The daily can be replayed by quitting part-way or using a second device.
+- Fonts load from Google Fonts with a `<link>`. Switch to `next/font` to self-host them.
