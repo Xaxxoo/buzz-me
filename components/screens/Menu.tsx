@@ -23,10 +23,10 @@ export function Menu({ active, save, you, authStatus, username, onPlay, onDaily,
   const streak = liveStreak(save);
   const authed = authStatus === 'authenticated';
   return (
-    <section className="screen title enter" id="s-title" hidden={!active}>
+    <section className="screen title enter flex-auto min-h-0 flex flex-col gap-3 items-center justify-safe-center text-center overflow-y-auto pt-3" id="s-title" hidden={!active}>
       <h1 className="logo">{GAME_NAME}</h1>
       <p className="lede">The inter-university quiz. Beat the other school to the buzzer.</p>
-      <div className="play-row">
+      <div className="flex items-center gap-4">
         <button className="dome big live" id="start" type="button" aria-label="Play a match" onClick={onPlay}>
           <span className="base" /><span className="cap">Play</span>
         </button>
@@ -37,7 +37,7 @@ export function Menu({ active, save, you, authStatus, username, onPlay, onDaily,
       {!authed && authStatus !== 'loading' && (
         <button className="btn ghost sign-in-cta" type="button" onClick={onSignIn}>Sign in to play online</button>
       )}
-      <nav className="menu" aria-label="Menu">
+      <nav className="grid grid-cols-2 gap-2.5 w-full max-w-[400px] mt-1" aria-label="Menu">
         <button className="tile" id="m-daily" type="button" onClick={onDaily}>
           <b>Daily challenge</b>
           <span id="m-daily-sub">

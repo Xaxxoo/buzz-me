@@ -95,9 +95,9 @@ export default function Game() {
     <>
       <Backdrop flashKey={flashKey} flashColor={flashColor} />
       <main className="stage" id="stage" data-screen={s.screen} ref={stage} style={vars}>
-        <div className="bar">
+        <div className="flex items-center justify-between min-h-9 shrink-0">
           <span className="mini">{GAME_NAME}</span>
-          <div className="bar-right">
+          <div className="flex items-center gap-2">
             {authState.status === 'authenticated' && <span className="auth-bar">{authState.user?.username}</span>}
             <button className="sound" id="sound" type="button" aria-pressed={s.muted} aria-label={s.muted ? 'Turn sound on' : 'Mute sound'} onClick={() => engine.toggleMute()}>
               <svg className="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
