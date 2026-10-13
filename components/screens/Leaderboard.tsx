@@ -87,18 +87,18 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
   }, [active, fetchPlayers, fetchUniversities, fetchOwnRank]);
 
   return (
-    <section className="screen enter" id="s-leaderboard" hidden={!active}>
-      <div className="head">
+    <section className="screen enter flex-auto min-h-0 flex flex-col gap-3" id="s-leaderboard" hidden={!active}>
+      <div className="head shrink-0 flex items-center justify-between gap-2.5">
         <h2>Leaderboard</h2>
         <button className="back" type="button" onClick={onMenu}>Menu</button>
       </div>
-      <div className="lb-tabs">
+      <div className="lb-tabs flex shrink-0 border-3 border-ink rounded-[14px] overflow-hidden">
         <button className={'lb-tab' + (tab === 'players' ? ' active' : '')} type="button" onClick={() => setTab('players')}>Players</button>
         <button className={'lb-tab' + (tab === 'universities' ? ' active' : '')} type="button" onClick={() => setTab('universities')}>Universities</button>
       </div>
 
       {tab === 'players' && (
-        <div className="lb-list">
+        <div className="lb-list flex-auto min-h-0 overflow-y-auto flex flex-col gap-2 pb-2">
           {players.map(p => (
             <div className="lb-row" key={p.id}>
               <span className="lb-rank">{p.rank}</span>
@@ -125,7 +125,7 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
       )}
 
       {tab === 'universities' && (
-        <div className="lb-list">
+        <div className="lb-list flex-auto min-h-0 overflow-y-auto flex flex-col gap-2 pb-2">
           {universities.map(u => (
             <div className="lb-row" key={u.id}>
               <span className="lb-rank">{u.rank}</span>

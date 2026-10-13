@@ -32,17 +32,17 @@ export function Login({ active, auth, onSignup, onMenu }: Props) {
   };
 
   return (
-    <section className="screen enter" id="s-login" hidden={!active}>
-      <div className="head">
+    <section className="screen enter flex-auto min-h-0 flex flex-col gap-3" id="s-login" hidden={!active}>
+      <div className="head shrink-0 flex items-center justify-between gap-2.5">
         <h2>Sign in</h2>
         <button className="back" type="button" onClick={onMenu}>Menu</button>
       </div>
-      <form className="auth-form" onSubmit={submit}>
-        <label className="form-field">
+      <form className="auth-form flex flex-col gap-3.5 max-w-[380px] w-full mx-auto p-5 px-4" onSubmit={submit}>
+        <label className="form-field flex flex-col gap-[5px]">
           <span>Email</span>
           <input className="form-input" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} />
         </label>
-        <label className="form-field">
+        <label className="form-field flex flex-col gap-[5px]">
           <span>Password</span>
           <input className="form-input" type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} />
         </label>
