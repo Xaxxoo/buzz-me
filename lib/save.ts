@@ -1,9 +1,10 @@
+import type { Api } from './api';
 import { DAILY, SAVE_KEY } from './config';
 import { QUESTIONS } from './data/questions';
 import { hash } from './schools';
 import type { Question } from './types';
 
-/* Progress is kept in this browser's localStorage. Swap loadSave/writeSave for an API when accounts exist. */
+/* Progress is kept in this browser's localStorage. syncSave/loadServerSave mirror it to the server when authenticated. */
 
 export type Mark = 'right' | 'wrong' | 'skip';
 
@@ -52,6 +53,20 @@ export function loadSave(): Save {
 
 export function writeSave(s: Save) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch { /* private window or storage blocked */ }
+}
+
+/** Fire-and-forget upload of save data to the server. */
+export function syncSave(api: Api, save: Save) {
+  api.put('/users/me/save', { save }).catch(() => { /* silently ignore */ });
+}
+
+/** Fetch save data from the server, or null on failure. */
+export async function loadServerSave(api: Api): Promise<Save | null> {
+  try {
+    const data = await api.get<Save>('/users/me/save');
+    if (data && typeof data === 'object') return { ...defaultSave(), ...data, streak: { ...defaultSave().streak, ...(data.streak || {}) } };
+    return null;
+  } catch { return null; }
 }
 
 /* The daily turns over at midnight UTC, so everyone gets the same set on the same day. */
