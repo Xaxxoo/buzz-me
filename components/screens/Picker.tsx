@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Crest } from '@/components/Crest';
+import { ROUNDS } from '@/lib/config';
+import { LOCAL_CATEGORIES, availableCount } from '@/lib/data/questions';
 import { ALL, COUNTRIES, UNIS, fold, school } from '@/lib/schools';
 import { sfx } from '@/lib/sfx';
 import type { School } from '@/lib/types';
@@ -11,6 +13,10 @@ interface Props {
   you: School | null;
   /** true when the player is on the way to the daily challenge */
   forDaily: boolean;
+  selectedCategories: string[];
+  difficulty: 'easy' | 'medium' | 'hard';
+  onSetCategories: (cats: string[]) => void;
+  onSetDifficulty: (d: 'easy' | 'medium' | 'hard') => void;
   onChoose: (s: School) => void;
   onGo: () => void;
   onMenu: () => void;
@@ -20,7 +26,7 @@ function Row({ s, sub, add, picked, onChoose }: { s: School; sub: string; add?: 
   return (
     <button type="button" className={'school' + (add ? ' add' : '')} aria-pressed={picked} onClick={() => onChoose(s)}>
       <Crest school={s} />
-      <span className="nm"><span>{add ? `Add “${s.name}”` : s.name}</span><small>{sub}</small></span>
+      <span className="nm"><span>{add ? `Add "${s.name}"` : s.name}</span><small>{sub}</small></span>
     </button>
   );
 }
@@ -30,7 +36,7 @@ function Row({ s, sub, add, picked, onChoose }: { s: School; sub: string; add?: 
  * A school that is not listed can be typed in and played for anyway.
  * Game.tsx remounts this each time the picker opens, so search and country start fresh.
  */
-export function Picker({ active, you, forDaily, onChoose, onGo, onMenu }: Props) {
+export function Picker({ active, you, forDaily, selectedCategories, difficulty, onSetCategories, onSetDifficulty, onChoose, onGo, onMenu }: Props) {
   const [country, setCountry] = useState<string | null>(() => (you && UNIS[you.country] ? you.country : null));
   const [query, setQuery] = useState('');
   const list = useRef<HTMLDivElement>(null);
@@ -68,6 +74,18 @@ export function Picker({ active, you, forDaily, onChoose, onGo, onMenu }: Props)
     ));
   }
 
+  const toggleCat = (cat: string) => {
+    sfx.tap();
+    if (selectedCategories.includes(cat)) {
+      onSetCategories(selectedCategories.filter(c => c !== cat));
+    } else {
+      onSetCategories([...selectedCategories, cat]);
+    }
+  };
+
+  const poolSize = availableCount(selectedCategories);
+  const tooFew = selectedCategories.length > 0 && poolSize < ROUNDS;
+
   return (
     <section className="screen pick enter flex-auto min-h-0 flex flex-col gap-2.5" id="s-pick" hidden={!active}>
       <div className="head shrink-0 flex items-center justify-between gap-2.5">
@@ -89,7 +107,42 @@ export function Picker({ active, you, forDaily, onChoose, onGo, onMenu }: Props)
         </div>
       )}
       <div className={'list' + (!searching && !country ? ' countries' : '')} id="list" ref={list}>{rows}</div>
-      <button className="btn" id="go" type="button" disabled={!you} onClick={onGo}>{you ? 'Play for ' + you.short : 'Choose a school'}</button>
+
+      {!forDaily && (
+        <>
+          <div className="flex flex-wrap gap-1.5 shrink-0" role="group" aria-label="Categories">
+            <button
+              type="button" className="cat-chip"
+              aria-pressed={selectedCategories.length === 0}
+              onClick={() => { sfx.tap(); onSetCategories([]); }}
+            >All</button>
+            {LOCAL_CATEGORIES.map(cat => (
+              <button
+                key={cat} type="button" className="cat-chip"
+                aria-pressed={selectedCategories.includes(cat)}
+                onClick={() => toggleCat(cat)}
+              >{cat}</button>
+            ))}
+          </div>
+          {selectedCategories.length > 0 && (
+            <p className="pick-note" style={{ margin: 0 }}>
+              {poolSize} question{poolSize !== 1 ? 's' : ''} available
+              {tooFew ? ` (need at least ${ROUNDS})` : ''}
+            </p>
+          )}
+          <div className="diff-bar" role="group" aria-label="Bot difficulty">
+            {(['easy', 'medium', 'hard'] as const).map(d => (
+              <button
+                key={d} type="button"
+                className={'diff-btn' + (difficulty === d ? ' active' : '')}
+                onClick={() => { sfx.tap(); onSetDifficulty(d); }}
+              >{d[0].toUpperCase() + d.slice(1)}</button>
+            ))}
+          </div>
+        </>
+      )}
+
+      <button className="btn" id="go" type="button" disabled={!you || tooFew} onClick={onGo}>{you ? 'Play for ' + you.short : 'Choose a school'}</button>
     </section>
   );
 }
