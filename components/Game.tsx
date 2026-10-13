@@ -88,7 +88,8 @@ export default function Game() {
 
   const onQuickMatch = () => {
     engine.findQuickMatch();
-    socket.findMatch();
+    const cats = engine.getSnapshot().selectedCategories;
+    socket.findMatch(cats.length ? cats : undefined);
   };
 
   return (
@@ -118,6 +119,8 @@ export default function Game() {
         />
         <Picker
           key={s.pickKey} active={s.screen === 's-pick'} you={s.you} forDaily={s.pending === 'daily'}
+          selectedCategories={s.selectedCategories} difficulty={s.difficulty}
+          onSetCategories={cats => engine.setCategories(cats)} onSetDifficulty={d => engine.setDifficulty(d)}
           onChoose={sch => engine.choose(sch)} onGo={() => engine.go()} onMenu={() => engine.menu()}
         />
         <Stats active={s.screen === 's-stats'} save={s.save} you={s.you} onMenu={() => engine.menu()} />
