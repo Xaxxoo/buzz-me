@@ -69,8 +69,8 @@ export function Picker({ active, you, forDaily, onChoose, onGo, onMenu }: Props)
   }
 
   return (
-    <section className="screen pick enter" id="s-pick" hidden={!active}>
-      <div className="head">
+    <section className="screen pick enter flex-auto min-h-0 flex flex-col gap-2.5" id="s-pick" hidden={!active}>
+      <div className="head shrink-0 flex items-center justify-between gap-2.5">
         <h2 id="pick-title">{forDaily ? 'Pick your school for the daily' : 'Pick your school'}</h2>
         <button className="back" id="pick-back" type="button" onClick={onMenu}>Menu</button>
       </div>
@@ -83,7 +83,7 @@ export function Picker({ active, you, forDaily, onChoose, onGo, onMenu }: Props)
         <p className="pick-note" id="pick-note">{ALL.length} universities in {COUNTRIES.length} countries. Pick a country, or search by name.</p>
       )}
       {!searching && country && (
-        <div className="crumb" id="crumb">
+        <div className="crumb shrink-0 flex items-center gap-2.5 min-w-0" id="crumb">
           <button id="back" type="button" onClick={() => { sfx.tap(); setCountry(null); }}>All countries</button>
           <b id="crumb-name">{country}, {UNIS[country].length} {UNIS[country].length === 1 ? 'school' : 'schools'}</b>
         </div>

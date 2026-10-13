@@ -53,27 +53,27 @@ function Card({ result, authStatus, onAgain, onMenu, onSignup }: { result: Match
       <div className="share">
         <p className="share-name">{GAME_NAME}</p>
         <h2 id="verdict">{result.verdict}</h2>
-        <div className="final">
-          <div className="f">
+        <div className="final grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
+          <div className="f flex flex-col items-center gap-1 min-w-0">
             <span id="f-you-crest"><Crest school={result.you} /></span>
             <b id="f-you">{num(mine)}</b>
             <span id="f-you-name">{daily ? `out of ${DAILY * 20}, for ${result.you.name}` : result.you.name}</span>
           </div>
           {!daily && <>
             <span className="dash">&ndash;</span>
-            <div className="f" id="f-rival-box">
+            <div className="f flex flex-col items-center gap-1 min-w-0" id="f-rival-box">
               <span id="f-rival-crest"><Crest school={result.rival} /></span>
               <b id="f-rival">{num(theirs)}</b>
               <span id="f-rival-name">{result.rival.name}</span>
             </div>
           </>}
         </div>
-        {daily && <div className="marks" id="marks">{result.marks.map((m, i) => <i key={i} className={m} />)}</div>}
+        {daily && <div className="marks flex justify-center gap-[5px]" id="marks">{result.marks.map((m, i) => <i key={i} className={m} />)}</div>}
         <StatCells id="stats" cells={result.cells} />
         {!daily && <p className="rate" id="rate">{result.rate}</p>}
         <p className="dare" id="dare">{result.dare}</p>
       </div>
-      <div className="actions">
+      <div className="actions grid grid-cols-2 gap-2.5">
         <button className="btn" id="again" type="button" onClick={onAgain}>{daily ? 'Play a match' : 'Rematch'}</button>
         <button className="btn ghost" id="copy" type="button" onClick={onCopy}>
           {copy === 'copied' ? 'Copied' : copy === 'manual' ? 'Select and copy below' : 'Copy result'}
@@ -90,7 +90,7 @@ function Card({ result, authStatus, onAgain, onMenu, onSignup }: { result: Match
 
 export function Result({ active, result, resultKey, authStatus, onAgain, onMenu, onSignup }: Props) {
   return (
-    <section className={'screen result enter' + (result?.kind === 'daily' ? ' daily' : '')} id="s-result" hidden={!active}>
+    <section className={'screen result enter flex-auto min-h-0 flex flex-col gap-3 justify-center' + (result?.kind === 'daily' ? ' daily' : '')} id="s-result" hidden={!active}>
       {result && <Card key={resultKey} result={result} authStatus={authStatus} onAgain={onAgain} onMenu={onMenu} onSignup={onSignup} />}
     </section>
   );

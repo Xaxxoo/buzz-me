@@ -38,7 +38,7 @@ function TeamPanel({ team, school, score, seat }: { team: Team; school: School; 
       <div className="meta">
         <div className="who" id={'n-' + team}>{school.short}</div>
         <div key={bump} className={'pts' + (bump ? ' hit' : '')} id={'sc-' + team}>{num(shown)}</div>
-        <div className="seats" id={'seats-' + team}>
+        <div className="seats flex gap-1 mt-[5px]" id={'seats-' + team}>
           {[0, 1, 2, 3].map(i => <i key={i} className={seat && seat.team === team && seat.idx === i ? 'on' : ''} />)}
         </div>
       </div>
@@ -65,7 +65,7 @@ export function Match({ active, s, boardKey, onBuzz, onAnswer }: Props) {
   useEffect(() => { const el = qtext.current; if (el) el.scrollTop = el.scrollHeight; }, [s.words.length]);
 
   return (
-    <section className="screen match enter" id="s-match" hidden={!active}>
+    <section className="screen match enter flex-auto min-h-0 flex flex-col gap-3" id="s-match" hidden={!active}>
       <header className={'board' + (solo ? ' solo' : '')} id="board">
         {s.you && <TeamPanel key={'you' + boardKey} team="you" school={s.you} score={s.scoreYou} seat={s.seat} />}
         <span className="mid">vs</span>
@@ -81,7 +81,7 @@ export function Match({ active, s, boardKey, onBuzz, onAnswer }: Props) {
         )}
       </header>
 
-      <div className="pips" id="pips" aria-hidden="true">
+      <div className="pips flex gap-[5px] shrink-0" id="pips" aria-hidden="true">
         {Array.from({ length: s.total }, (_, i) => <i key={i} className={s.took[i] || (i === s.qi ? 'now' : '')} />)}
       </div>
 
@@ -98,8 +98,8 @@ export function Match({ active, s, boardKey, onBuzz, onAnswer }: Props) {
 
       <p className="status" id="status" role="status" aria-live="polite">{s.status}</p>
 
-      <div className="zone">
-        <div className="z-buzz" id="z-buzz" hidden={s.zone !== 'buzz'}>
+      <div className="zone shrink-0 min-h-[226px] flex flex-col justify-center">
+        <div className="z-buzz flex flex-col items-center gap-3" id="z-buzz" hidden={s.zone !== 'buzz'}>
           <Meter id="window" k={s.window.key} secs={s.window.secs} hideWhenIdle />
           <button
             className={'dome' + (s.buzzLive ? ' live' : '')} id="buzz" type="button" aria-label="Buzz" disabled={!s.buzzLive}
@@ -109,7 +109,7 @@ export function Match({ active, s, boardKey, onBuzz, onAnswer }: Props) {
           </button>
         </div>
 
-        <div className="z-opts" id="z-opts" hidden={s.zone !== 'opts'}>
+        <div className="z-opts flex flex-col gap-2" id="z-opts" hidden={s.zone !== 'opts'}>
           {s.ask && <>
             <Meter id="timer" k={s.ask.key} secs={s.ask.secs} paused={s.ask.paused} />
             <div className="opts" id="opts">
@@ -122,7 +122,7 @@ export function Match({ active, s, boardKey, onBuzz, onAnswer }: Props) {
           </>}
         </div>
 
-        <div className="z-rival" id="z-rival" hidden={s.zone !== 'rival'}>
+        <div className="z-rival flex items-center gap-3.5 justify-center" id="z-rival" hidden={s.zone !== 'rival'}>
           {s.rival && s.rivalView && <>
             <span id="rv-crest"><Crest school={s.rival} /></span>
             <div className={'bubble' + (s.rivalView.mark ? ' ' + s.rivalView.mark : '')} id="bubble">
