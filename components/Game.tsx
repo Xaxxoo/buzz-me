@@ -10,11 +10,13 @@ import { Picker } from '@/components/screens/Picker';
 import { Result } from '@/components/screens/Result';
 import { Signup } from '@/components/screens/Signup';
 import { Stats } from '@/components/screens/Stats';
+import { Team } from '@/components/screens/Team';
 import { Versus } from '@/components/screens/Versus';
 import { AuthClient } from '@/lib/auth';
-import { GAME_NAME } from '@/lib/config';
+import { API_BASE, GAME_NAME } from '@/lib/config';
 import { GameEngine } from '@/lib/engine';
 import { SocketClient } from '@/lib/socket';
+import type { TeamData } from '@/lib/types';
 
 /**
  * The whole game is one client component tree driven by a GameEngine instance.
@@ -92,6 +94,35 @@ export default function Game() {
     socket.findMatch(cats.length ? cats : undefined);
   };
 
+  const fetchMyTeams = async () => {
+    try {
+      const res = await auth.api.get<TeamData[]>('/teams/mine');
+      engine.setMyTeams(res);
+    } catch { /* ignore */ }
+  };
+  const onTeams = () => { engine.showTeams(); fetchMyTeams(); };
+  const onCreateTeam = async (name: string) => {
+    try {
+      await auth.api.post('/teams', { name });
+      await fetchMyTeams();
+      engine.backToTeamList();
+    } catch { /* ignore */ }
+  };
+  const onJoinByCode = async (code: string) => {
+    try {
+      await auth.api.post(`/teams/join/${code}`);
+      await fetchMyTeams();
+    } catch { /* ignore */ }
+  };
+  const onSelectTeam = (team: TeamData) => {
+    engine.showTeamLobby(team);
+    socket.joinTeamLobby(team.id);
+  };
+  const onLeaveLobby = (teamId: string) => {
+    socket.leaveTeamLobby(teamId);
+    engine.backToTeamList();
+  };
+
   return (
     <>
       <Backdrop flashKey={flashKey} flashColor={flashColor} />
@@ -116,6 +147,7 @@ export default function Game() {
           authStatus={authState.status} username={authState.user?.username ?? null}
           onPlay={() => engine.play()} onDaily={() => engine.daily()} onStats={() => engine.showStats()}
           onSignIn={() => engine.showLogin()} onQuickMatch={onQuickMatch} onLeaderboard={() => engine.showLeaderboard()}
+          onTeams={onTeams}
         />
         <Picker
           key={s.pickKey} active={s.screen === 's-pick'} you={s.you} forDaily={s.pending === 'daily'}
@@ -133,6 +165,27 @@ export default function Game() {
         />
         <Login active={s.screen === 's-login'} auth={auth} onSignup={() => engine.showSignup()} onMenu={() => engine.menu()} />
         <Signup active={s.screen === 's-signup'} auth={auth} onLogin={() => engine.showLogin()} onMenu={() => engine.menu()} />
+        <Team
+          active={s.screen === 's-team'}
+          myTeams={s.myTeams}
+          teamView={s.teamView}
+          activeTeam={s.activeTeam}
+          lobby={s.lobby}
+          teamFinding={s.teamFinding}
+          userId={authState.user?.id ?? null}
+          onMenu={() => engine.menu()}
+          onCreateTeam={onCreateTeam}
+          onJoinByCode={onJoinByCode}
+          onSelectTeam={onSelectTeam}
+          onShowCreate={() => engine.showCreateTeam()}
+          onBackToList={() => engine.backToTeamList()}
+          onJoinLobby={(teamId) => socket.joinTeamLobby(teamId)}
+          onLeaveLobby={onLeaveLobby}
+          onReady={(teamId, ready) => socket.teamReady(teamId, ready)}
+          onStartFind={(teamId) => socket.teamStartFind(teamId)}
+          onCancelFind={(teamId) => socket.teamCancelFind(teamId)}
+          onChallenge={(teamId, code) => socket.teamChallenge(teamId, code)}
+        />
         <Leaderboard active={s.screen === 's-leaderboard'} auth={auth} authStatus={authState.status} onMenu={() => engine.menu()} />
       </main>
     </>

@@ -16,9 +16,10 @@ interface Props {
   onSignIn: () => void;
   onQuickMatch: () => void;
   onLeaderboard: () => void;
+  onTeams: () => void;
 }
 
-export function Menu({ active, save, you, authStatus, username, onPlay, onDaily, onStats, onSignIn, onQuickMatch, onLeaderboard }: Props) {
+export function Menu({ active, save, you, authStatus, username, onPlay, onDaily, onStats, onSignIn, onQuickMatch, onLeaderboard, onTeams }: Props) {
   const done = !!save.daily && save.daily.date === today();
   const streak = liveStreak(save);
   const authed = authStatus === 'authenticated';
@@ -53,6 +54,12 @@ export function Menu({ active, save, you, authStatus, username, onPlay, onDaily,
           <b>Leaderboard</b>
           <span>See how you rank against other players.</span>
         </button>
+        {authed && (
+          <button className="tile" id="m-teams" type="button" onClick={onTeams}>
+            <b>Teams</b>
+            <span>Form a squad and play together.</span>
+          </button>
+        )}
       </nav>
       <ul className="rules">
         <li><b>10</b>for a right answer</li>

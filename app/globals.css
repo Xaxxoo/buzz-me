@@ -277,6 +277,23 @@
 
   /* head title */
   .head h2 { margin: 0; min-width: 0; font: 900 clamp(20px,6.4vw,26px)/1.05 var(--font-display); letter-spacing: -.03em; }
+
+  /* team card */
+  .team-card { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 12px 14px; background: var(--color-paper); border: 3px solid var(--color-ink); border-radius: 16px; box-shadow: 0 4px 0 var(--color-ink); text-align: left; cursor: pointer; transition: transform .08s, box-shadow .08s; }
+  .team-card:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--color-ink); }
+  .team-card b { display: block; font: 900 14px/1.1 var(--font-display); letter-spacing: -.02em; }
+  .team-card span { display: block; font: 600 12.5px/1.25 var(--font-body); }
+
+  /* invite code */
+  .invite-code { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 16px; border: 3px dashed var(--color-ink); border-radius: 16px; background: var(--color-paper); cursor: pointer; text-align: center; }
+  .invite-code .code { font: 900 28px/1 var(--font-display); letter-spacing: .12em; }
+  .invite-code .copy-hint { font: 600 12px/1 var(--font-body); opacity: .55; }
+
+  /* lobby member */
+  .lobby-member { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; background: var(--color-paper); border: 3px solid var(--color-ink); border-radius: 14px; box-shadow: 0 3px 0 var(--color-ink); }
+  .ready-dot { flex: none; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--color-ink); background: var(--color-fog); transition: background .2s; }
+  .ready-dot.on { background: var(--color-leaf); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-leaf) 25%, transparent); }
+  .role-badge { padding: 3px 8px; border-radius: 99px; background: var(--color-ink); color: var(--color-paper); font: 700 10px/1 var(--font-display); }
 }
 
 /* ── Keyframes ── */
