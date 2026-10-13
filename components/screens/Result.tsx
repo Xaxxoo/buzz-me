@@ -6,17 +6,20 @@ import { StatCells } from '@/components/screens/Stats';
 import { DAILY, GAME_NAME } from '@/lib/config';
 import { num, shareText, type DailyResult, type MatchResult } from '@/lib/engine';
 import { useCountUp } from '@/lib/hooks';
+import type { AuthStatus } from '@/lib/auth';
 
 interface Props {
   active: boolean;
   result: MatchResult | DailyResult | null;
   resultKey: number;
+  authStatus: AuthStatus;
   onAgain: () => void;
   onMenu: () => void;
+  onSignup: () => void;
 }
 
 /* Remounted for every new result (key), so the scores count up from zero and the copy button resets. */
-function Card({ result, onAgain, onMenu }: { result: MatchResult | DailyResult; onAgain: () => void; onMenu: () => void }) {
+function Card({ result, authStatus, onAgain, onMenu, onSignup }: { result: MatchResult | DailyResult; authStatus: AuthStatus; onAgain: () => void; onMenu: () => void; onSignup: () => void }) {
   const daily = result.kind === 'daily';
   const mine = useCountUp(daily ? result.score : result.scoreYou, 900, 0);
   const theirs = useCountUp(daily ? 0 : result.scoreRival, 900, 0);
@@ -77,15 +80,18 @@ function Card({ result, onAgain, onMenu }: { result: MatchResult | DailyResult; 
         </button>
         <button className="btn ghost" id="to-menu" type="button" onClick={onMenu}>Menu</button>
       </div>
+      {authStatus === 'guest' && (
+        <button className="btn ghost save-cta" type="button" onClick={onSignup}>Create an account to save your progress</button>
+      )}
       {copy === 'manual' && <p className="copyfallback" id="copyfallback" ref={fallback}>{text}</p>}
     </>
   );
 }
 
-export function Result({ active, result, resultKey, onAgain, onMenu }: Props) {
+export function Result({ active, result, resultKey, authStatus, onAgain, onMenu, onSignup }: Props) {
   return (
     <section className={'screen result enter' + (result?.kind === 'daily' ? ' daily' : '')} id="s-result" hidden={!active}>
-      {result && <Card key={resultKey} result={result} onAgain={onAgain} onMenu={onMenu} />}
+      {result && <Card key={resultKey} result={result} authStatus={authStatus} onAgain={onAgain} onMenu={onMenu} onSignup={onSignup} />}
     </section>
   );
 }
