@@ -7,8 +7,10 @@ import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { GameService } from './game.service';
 import { MatchmakingService } from './matchmaking.service';
+import { TeamLobbyService } from './team-lobby.service';
+import { TeamMatchmakingService } from './team-matchmaking.service';
+import { TeamsService } from '../teams/teams.service';
 import { WsExceptionFilter } from '../common/filters/ws-exception.filter';
-import { isBot } from './types/game-room';
 
 @UseFilters(new WsExceptionFilter())
 @WebSocketGateway({ namespace: '/game', cors: { origin: '*' } })
@@ -22,6 +24,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private jwtService: JwtService,
     private gameService: GameService,
     private matchmakingService: MatchmakingService,
+    private teamLobbyService: TeamLobbyService,
+    private teamMatchmakingService: TeamMatchmakingService,
+    private teamsService: TeamsService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -55,6 +60,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     this.logger.log(`Client disconnected: ${user.username} (${client.id})`);
     this.matchmakingService.removeFromQueue(user.id);
+    // Clean up team lobby if disconnected
+    const lobby = this.teamLobbyService.getLobbyByUser(user.id);
+    if (lobby) this.teamLobbyService.leaveLobby(lobby.teamId, user.id, this.server);
     this.gameService.handleDisconnect(user.id);
   }
 
@@ -118,7 +126,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const room = this.gameService.getRoomByUser(user.id);
     if (!room) return;
 
-    const side = (room.playerA as any).userId === user.id ? 'a' : 'b';
+    const side = this.gameService.findSideByUser(room, user.id) || 'b';
 
     if (room.phase === 'answering') {
       this.gameService.handleAnswer(room, side, data.option_index);
@@ -141,5 +149,126 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (!success) {
       client.emit('error', { message: 'Match not found or expired' });
     }
+  }
+
+  // ---------- Team handlers ----------
+
+  @SubscribeMessage('team:join_lobby')
+  async handleTeamJoinLobby(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { team_id: string },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    try {
+      const team = await this.teamsService.findOne(data.team_id);
+      const isMember = team.members?.some(m => m.user_id === user.id);
+      if (!isMember) {
+        client.emit('error', { message: 'You are not a member of this team' });
+        return;
+      }
+
+      const dbUser = await this.gameService.getDbUser?.(user.id);
+      this.teamLobbyService.joinLobby(
+        team.id,
+        team.name,
+        team.invite_code,
+        team.university_id,
+        team.captain_id,
+        {
+          id: user.id,
+          username: user.username,
+          rating: dbUser?.rating || 1000,
+          universityId: dbUser?.university_id || null,
+        },
+        client,
+      );
+    } catch (err: any) {
+      client.emit('error', { message: err.message || 'Failed to join lobby' });
+    }
+  }
+
+  @SubscribeMessage('team:leave_lobby')
+  handleTeamLeaveLobby(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { team_id: string },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    this.teamLobbyService.leaveLobby(data.team_id, user.id, this.server);
+  }
+
+  @SubscribeMessage('team:ready')
+  handleTeamReady(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { team_id: string; ready: boolean },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    this.teamLobbyService.setReady(data.team_id, user.id, data.ready, this.server);
+  }
+
+  @SubscribeMessage('team:start_find')
+  handleTeamStartFind(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { team_id: string; categories?: string[] },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    const lobby = this.teamLobbyService.getLobby(data.team_id);
+    if (!lobby) {
+      client.emit('error', { message: 'Lobby not found' });
+      return;
+    }
+    if (lobby.captainId !== user.id) {
+      client.emit('error', { message: 'Only the captain can start matchmaking' });
+      return;
+    }
+    if (!this.teamLobbyService.allReady(data.team_id)) {
+      client.emit('error', { message: 'All members must be ready' });
+      return;
+    }
+
+    this.teamMatchmakingService.addToQueue(lobby, data.categories || []);
+  }
+
+  @SubscribeMessage('team:cancel_find')
+  handleTeamCancelFind(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { team_id: string },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    this.teamMatchmakingService.removeFromQueue(data.team_id);
+  }
+
+  @SubscribeMessage('team:challenge')
+  handleTeamChallenge(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { team_id: string; opponent_code: string },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    const lobby = this.teamLobbyService.getLobby(data.team_id);
+    if (!lobby) {
+      client.emit('error', { message: 'Lobby not found' });
+      return;
+    }
+    if (lobby.captainId !== user.id) {
+      client.emit('error', { message: 'Only the captain can issue a challenge' });
+      return;
+    }
+    if (!this.teamLobbyService.allReady(data.team_id)) {
+      client.emit('error', { message: 'All members must be ready' });
+      return;
+    }
+
+    this.teamMatchmakingService.challengeByCode(lobby, data.opponent_code);
   }
 }

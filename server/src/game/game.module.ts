@@ -5,8 +5,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GameGateway } from './game.gateway';
 import { GameService } from './game.service';
 import { MatchmakingService } from './matchmaking.service';
+import { TeamLobbyService } from './team-lobby.service';
+import { TeamMatchmakingService } from './team-matchmaking.service';
 import { ScoringService } from './scoring.service';
 import { QuestionsModule } from '../questions/questions.module';
+import { TeamsModule } from '../teams/teams.module';
 import { User } from '../entities/user.entity';
 import { Match } from '../entities/match.entity';
 import { MatchParticipant } from '../entities/match-participant.entity';
@@ -16,6 +19,7 @@ import { Round } from '../entities/round.entity';
   imports: [
     TypeOrmModule.forFeature([User, Match, MatchParticipant, Round]),
     QuestionsModule,
+    TeamsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -25,7 +29,7 @@ import { Round } from '../entities/round.entity';
       }),
     }),
   ],
-  providers: [GameGateway, GameService, MatchmakingService, ScoringService],
+  providers: [GameGateway, GameService, MatchmakingService, TeamLobbyService, TeamMatchmakingService, ScoringService],
   exports: [GameService],
 })
 export class GameModule {}
