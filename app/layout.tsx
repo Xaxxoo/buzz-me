@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Figtree:wght@500;600;800&display=swap" />
       </head>
-      <body>{children}</body>
+      <body className="bg-sun text-ink font-body text-base overflow-hidden px-4 select-none">{children}</body>
     </html>
   );
 }
