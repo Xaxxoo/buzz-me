@@ -22,6 +22,15 @@ export interface BotSlot {
   difficulty: 'easy' | 'medium' | 'hard';
 }
 
+export interface TeamSlot {
+  teamId: string;
+  teamName: string;
+  universityId: string | null;
+  players: PlayerSlot[];
+  score: number;
+  side: 'a' | 'b';
+}
+
 export interface RoomQuestion {
   id: string;
   categoryId: string;
@@ -46,10 +55,10 @@ export type RoomPhase =
 
 export interface GameRoom {
   id: string;
-  type: 'solo' | 'quick';
+  type: 'solo' | 'quick' | 'team';
   ranked: boolean;
-  playerA: PlayerSlot;
-  playerB: PlayerSlot | BotSlot;
+  playerA: PlayerSlot | TeamSlot;
+  playerB: PlayerSlot | BotSlot | TeamSlot;
   questions: RoomQuestion[];
   currentRound: number;
   phase: RoomPhase;
@@ -62,6 +71,10 @@ export interface GameRoom {
   createdAt: number;
 }
 
-export function isBot(slot: PlayerSlot | BotSlot): slot is BotSlot {
-  return 'isBot' in slot && slot.isBot;
+export function isBot(slot: PlayerSlot | BotSlot | TeamSlot): slot is BotSlot {
+  return 'isBot' in slot && (slot as any).isBot;
+}
+
+export function isTeam(slot: PlayerSlot | BotSlot | TeamSlot): slot is TeamSlot {
+  return 'players' in slot && Array.isArray((slot as TeamSlot).players);
 }
