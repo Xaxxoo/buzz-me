@@ -3,8 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Socket } from 'socket.io';
 import {
-  GameRoom, PlayerSlot, BotSlot, RoomQuestion, isBot,
+  GameRoom, PlayerSlot, BotSlot, TeamSlot, RoomQuestion, isBot, isTeam,
 } from './types/game-room';
+import type { TeamLobby } from './types/team-lobby';
 import { ScoringService } from './scoring.service';
 import { QuestionsService } from '../questions/questions.service';
 import { User } from '../entities/user.entity';
@@ -33,13 +34,34 @@ export class GameService {
     @InjectRepository(Round) private roundRepo: Repository<Round>,
   ) {}
 
+  async getDbUser(userId: string) {
+    return this.userRepo.findOneBy({ id: userId });
+  }
+
   getRoom(roomId: string): GameRoom | undefined {
     return this.rooms.get(roomId);
   }
 
   getRoomByUser(userId: string): GameRoom | undefined {
     const roomId = this.userRooms.get(userId);
-    return roomId ? this.rooms.get(roomId) : undefined;
+    if (roomId) return this.rooms.get(roomId);
+    // Fallback: search team player arrays
+    for (const room of this.rooms.values()) {
+      if (this.findSideByUser(room, userId)) return room;
+    }
+    return undefined;
+  }
+
+  /** Resolve userId to side, searching team players when needed. */
+  findSideByUser(room: GameRoom, userId: string): 'a' | 'b' | null {
+    const checkSlot = (slot: PlayerSlot | BotSlot | TeamSlot, side: 'a' | 'b'): boolean => {
+      if (isBot(slot)) return false;
+      if (isTeam(slot)) return slot.players.some(p => p.userId === userId);
+      return slot.userId === userId;
+    };
+    if (checkSlot(room.playerA, 'a')) return 'a';
+    if (checkSlot(room.playerB, 'b')) return 'b';
+    return null;
   }
 
   async createSoloRoom(socket: Socket, user: { id: string; username: string }): Promise<GameRoom> {
@@ -186,6 +208,112 @@ export class GameService {
     return room;
   }
 
+  async createTeamRoom(lobbyA: TeamLobby, lobbyB: TeamLobby): Promise<GameRoom> {
+    const memberIdsA = lobbyA.members.filter(m => m.socket).map(m => m.userId);
+    const memberIdsB = lobbyB.members.filter(m => m.socket).map(m => m.userId);
+    const allIds = [...memberIdsA, ...memberIdsB];
+    const dbUsers = await Promise.all(allIds.map(id => this.userRepo.findOneBy({ id })));
+    const userMap = new Map(dbUsers.filter(Boolean).map(u => [u!.id, u!]));
+
+    const questions = await this.questionsService.getRandomSet(ROUNDS);
+    const roomId = `team_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const roomQuestions: RoomQuestion[] = questions.map(q => ({
+      id: q.id,
+      categoryId: q.category_id,
+      categoryName: q.category?.name || '',
+      text: q.text,
+      words: q.text.split(' '),
+      options: q.options,
+      correctIndex: q.correct_option_index,
+      bonusText: q.bonus_text,
+      bonusOptions: q.bonus_options,
+    }));
+
+    const buildTeamSlot = (lobby: TeamLobby, side: 'a' | 'b'): TeamSlot => ({
+      teamId: lobby.teamId,
+      teamName: lobby.teamName,
+      universityId: lobby.universityId,
+      score: 0,
+      side,
+      players: lobby.members.filter(m => m.socket).map(m => {
+        const db = userMap.get(m.userId);
+        return {
+          userId: m.userId,
+          username: m.username,
+          rating: db?.rating || m.rating,
+          universityId: m.universityId,
+          socket: m.socket,
+          score: 0,
+          side,
+          connected: true,
+          disconnectedAt: null,
+          rtt: 0,
+        };
+      }),
+    });
+
+    const teamSlotA = buildTeamSlot(lobbyA, 'a');
+    const teamSlotB = buildTeamSlot(lobbyB, 'b');
+
+    // Ranked if both teams have a uniform university
+    const ranked = !!(lobbyA.universityId && lobbyB.universityId);
+
+    const room: GameRoom = {
+      id: roomId,
+      type: 'team',
+      ranked,
+      playerA: teamSlotA,
+      playerB: teamSlotB,
+      questions: roomQuestions,
+      currentRound: 0,
+      phase: 'countdown',
+      epoch: 0,
+      buzzedSide: null,
+      buzzedEarly: false,
+      wordIndex: 0,
+      answeredCorrectly: null,
+      answeredOption: null,
+      createdAt: Date.now(),
+    };
+
+    this.rooms.set(roomId, room);
+    this.timers.set(roomId, new Map());
+
+    // Register all players and join room
+    for (const p of teamSlotA.players) {
+      this.userRooms.set(p.userId, roomId);
+      p.socket?.join(roomId);
+    }
+    for (const p of teamSlotB.players) {
+      this.userRooms.set(p.userId, roomId);
+      p.socket?.join(roomId);
+    }
+
+    // Compute avg ratings for opponent info
+    const avgA = teamSlotA.players.reduce((s, p) => s + p.rating, 0) / teamSlotA.players.length;
+    const avgB = teamSlotB.players.reduce((s, p) => s + p.rating, 0) / teamSlotB.players.length;
+
+    // Notify all players
+    for (const p of teamSlotA.players) {
+      p.socket?.emit('match:found', {
+        match_id: roomId,
+        opponent: { id: lobbyB.teamId, username: lobbyB.teamName, rating: Math.round(avgB) },
+        you_side: 'a',
+      });
+    }
+    for (const p of teamSlotB.players) {
+      p.socket?.emit('match:found', {
+        match_id: roomId,
+        opponent: { id: lobbyA.teamId, username: lobbyA.teamName, rating: Math.round(avgA) },
+        you_side: 'b',
+      });
+    }
+
+    this.startCountdown(room);
+    return room;
+  }
+
   // ---------- Game loop ----------
 
   private scheduleTimer(room: GameRoom, fn: () => void, ms: number) {
@@ -201,19 +329,30 @@ export class GameService {
   }
 
   private emitToRoom(room: GameRoom, event: string, data: any) {
-    const a = room.playerA as PlayerSlot;
-    if (a.socket && a.connected) a.socket.emit(event, data);
-
-    if (!isBot(room.playerB)) {
-      const b = room.playerB;
-      if (b.socket && b.connected) b.socket.emit(event, data);
-    }
+    const emitSlot = (slot: PlayerSlot | BotSlot | TeamSlot) => {
+      if (isBot(slot)) return;
+      if (isTeam(slot)) {
+        for (const p of slot.players) {
+          if (p.socket && p.connected) p.socket.emit(event, data);
+        }
+      } else {
+        if (slot.socket && slot.connected) slot.socket.emit(event, data);
+      }
+    };
+    emitSlot(room.playerA);
+    emitSlot(room.playerB);
   }
 
   private emitToSide(room: GameRoom, side: 'a' | 'b', event: string, data: any) {
-    const player = side === 'a' ? room.playerA : room.playerB;
-    if (isBot(player)) return;
-    if (player.socket && player.connected) player.socket.emit(event, data);
+    const slot = side === 'a' ? room.playerA : room.playerB;
+    if (isBot(slot)) return;
+    if (isTeam(slot)) {
+      for (const p of slot.players) {
+        if (p.socket && p.connected) p.socket.emit(event, data);
+      }
+    } else {
+      if (slot.socket && slot.connected) slot.socket.emit(event, data);
+    }
   }
 
   private startCountdown(room: GameRoom) {
@@ -308,8 +447,7 @@ export class GameService {
     if (room.phase !== 'reading' && room.phase !== 'buzz_open') return;
     if (room.buzzedSide) return; // Someone already buzzed
 
-    const player = room.playerA as PlayerSlot;
-    const side = player.userId === userId ? 'a' : 'b';
+    const side = this.findSideByUser(room, userId) || 'b';
 
     // Anti-cheat: flag impossibly fast buzzes
     const buzzTime = Date.now() - room.createdAt;
@@ -537,10 +675,15 @@ export class GameService {
 
     const scoreA = room.playerA.score;
     const scoreB = room.playerB.score;
+
+    if (room.type === 'team' && isTeam(room.playerA) && isTeam(room.playerB)) {
+      return this.finishTeamMatch(room, room.playerA, room.playerB);
+    }
+
     const playerA = room.playerA as PlayerSlot;
 
     // Calculate Elo
-    const opponentRating = isBot(room.playerB) ? 1000 : room.playerB.rating;
+    const opponentRating = isBot(room.playerB) ? 1000 : (room.playerB as PlayerSlot).rating;
     const resultA = this.scoring.matchResult(scoreA, scoreB);
     const deltaA = this.scoring.eloChange(playerA.rating, opponentRating, resultA);
     const newRatingA = playerA.rating + deltaA;
@@ -569,7 +712,7 @@ export class GameService {
     this.emitToSide(room, 'a', 'match:end', endDataA);
 
     if (!isBot(room.playerB)) {
-      const playerB = room.playerB;
+      const playerB = room.playerB as PlayerSlot;
       const resultB = this.scoring.matchResult(scoreB, scoreA);
       const deltaB = this.scoring.eloChange(playerB.rating, playerA.rating, resultB);
       const newRatingB = playerB.rating + deltaB;
@@ -603,6 +746,69 @@ export class GameService {
     this.cleanupRoom(room);
   }
 
+  private async finishTeamMatch(room: GameRoom, teamA: TeamSlot, teamB: TeamSlot) {
+    const scoreA = teamA.score;
+    const scoreB = teamB.score;
+
+    const avgRatingA = teamA.players.reduce((s, p) => s + p.rating, 0) / teamA.players.length;
+    const avgRatingB = teamB.players.reduce((s, p) => s + p.rating, 0) / teamB.players.length;
+
+    const resultA = this.scoring.matchResult(scoreA, scoreB);
+    const resultB = this.scoring.matchResult(scoreB, scoreA);
+    const deltaA = this.scoring.eloChange(avgRatingA, avgRatingB, resultA);
+    const deltaB = this.scoring.eloChange(avgRatingB, avgRatingA, resultB);
+
+    // Apply same Elo delta to all team members
+    for (const p of teamA.players) {
+      const newRating = p.rating + deltaA;
+      await this.userRepo.update(p.userId, {
+        rating: newRating,
+        matches_played: () => 'matches_played + 1',
+        matches_won: () => resultA === 1 ? 'matches_won + 1' : 'matches_won',
+        matches_lost: () => resultA === 0 ? 'matches_lost + 1' : 'matches_lost',
+        matches_drawn: () => resultA === 0.5 ? 'matches_drawn + 1' : 'matches_drawn',
+      } as any);
+
+      p.socket?.emit('match:end', {
+        match_id: room.id,
+        score_a: scoreA,
+        score_b: scoreB,
+        rating_before: p.rating,
+        rating_after: newRating,
+        rating_delta: deltaA,
+        opponent_rating_before: Math.round(avgRatingB),
+        rounds_won: 0,
+        total_rounds: room.questions.length,
+      });
+    }
+
+    for (const p of teamB.players) {
+      const newRating = p.rating + deltaB;
+      await this.userRepo.update(p.userId, {
+        rating: newRating,
+        matches_played: () => 'matches_played + 1',
+        matches_won: () => resultB === 1 ? 'matches_won + 1' : 'matches_won',
+        matches_lost: () => resultB === 0 ? 'matches_lost + 1' : 'matches_lost',
+        matches_drawn: () => resultB === 0.5 ? 'matches_drawn + 1' : 'matches_drawn',
+      } as any);
+
+      p.socket?.emit('match:end', {
+        match_id: room.id,
+        score_a: scoreA,
+        score_b: scoreB,
+        rating_before: p.rating,
+        rating_after: newRating,
+        rating_delta: deltaB,
+        opponent_rating_before: Math.round(avgRatingA),
+        rounds_won: 0,
+        total_rounds: room.questions.length,
+      });
+    }
+
+    await this.persistMatch(room);
+    this.cleanupRoom(room);
+  }
+
   private async persistMatch(room: GameRoom) {
     try {
       const match = this.matchRepo.create({
@@ -615,35 +821,60 @@ export class GameService {
       });
       const saved = await this.matchRepo.save(match);
 
-      const playerA = room.playerA as PlayerSlot;
-      const participantA = this.participantRepo.create({
-        match_id: saved.id,
-        user_id: playerA.userId,
-        team_side: 'a',
-        score: playerA.score,
-        rating_before: playerA.rating,
-        rating_after: playerA.rating + this.scoring.eloChange(
-          playerA.rating,
-          isBot(room.playerB) ? 1000 : room.playerB.rating,
-          this.scoring.matchResult(playerA.score, room.playerB.score),
-        ),
-      });
-      await this.participantRepo.save(participantA);
+      if (room.type === 'team' && isTeam(room.playerA) && isTeam(room.playerB)) {
+        // Persist participants for all team members
+        const teamA = room.playerA as TeamSlot;
+        const teamB = room.playerB as TeamSlot;
+        const avgA = teamA.players.reduce((s, p) => s + p.rating, 0) / teamA.players.length;
+        const avgB = teamB.players.reduce((s, p) => s + p.rating, 0) / teamB.players.length;
+        const resultA = this.scoring.matchResult(teamA.score, teamB.score);
+        const resultB = this.scoring.matchResult(teamB.score, teamA.score);
+        const deltaA = this.scoring.eloChange(avgA, avgB, resultA);
+        const deltaB = this.scoring.eloChange(avgB, avgA, resultB);
 
-      if (!isBot(room.playerB)) {
-        const playerB = room.playerB;
-        const participantB = this.participantRepo.create({
+        for (const p of teamA.players) {
+          await this.participantRepo.save(this.participantRepo.create({
+            match_id: saved.id, user_id: p.userId, team_side: 'a',
+            score: teamA.score, rating_before: p.rating, rating_after: p.rating + deltaA,
+          }));
+        }
+        for (const p of teamB.players) {
+          await this.participantRepo.save(this.participantRepo.create({
+            match_id: saved.id, user_id: p.userId, team_side: 'b',
+            score: teamB.score, rating_before: p.rating, rating_after: p.rating + deltaB,
+          }));
+        }
+      } else {
+        const playerA = room.playerA as PlayerSlot;
+        const participantA = this.participantRepo.create({
           match_id: saved.id,
-          user_id: playerB.userId,
-          team_side: 'b',
-          score: playerB.score,
-          rating_before: playerB.rating,
-          rating_after: playerB.rating + this.scoring.eloChange(
-            playerB.rating, playerA.rating,
-            this.scoring.matchResult(playerB.score, playerA.score),
+          user_id: playerA.userId,
+          team_side: 'a',
+          score: playerA.score,
+          rating_before: playerA.rating,
+          rating_after: playerA.rating + this.scoring.eloChange(
+            playerA.rating,
+            isBot(room.playerB) ? 1000 : (room.playerB as PlayerSlot).rating,
+            this.scoring.matchResult(playerA.score, room.playerB.score),
           ),
         });
-        await this.participantRepo.save(participantB);
+        await this.participantRepo.save(participantA);
+
+        if (!isBot(room.playerB)) {
+          const playerB = room.playerB as PlayerSlot;
+          const participantB = this.participantRepo.create({
+            match_id: saved.id,
+            user_id: playerB.userId,
+            team_side: 'b',
+            score: playerB.score,
+            rating_before: playerB.rating,
+            rating_after: playerB.rating + this.scoring.eloChange(
+              playerB.rating, playerA.rating,
+              this.scoring.matchResult(playerB.score, playerA.score),
+            ),
+          });
+          await this.participantRepo.save(participantB);
+        }
       }
     } catch (err) {
       this.logger.error('Failed to persist match', err);
@@ -651,11 +882,16 @@ export class GameService {
   }
 
   private cleanupRoom(room: GameRoom) {
-    const playerA = room.playerA as PlayerSlot;
-    this.userRooms.delete(playerA.userId);
-    if (!isBot(room.playerB)) {
-      this.userRooms.delete(room.playerB.userId);
-    }
+    const cleanSlot = (slot: PlayerSlot | BotSlot | TeamSlot) => {
+      if (isBot(slot)) return;
+      if (isTeam(slot)) {
+        for (const p of slot.players) this.userRooms.delete(p.userId);
+      } else {
+        this.userRooms.delete(slot.userId);
+      }
+    };
+    cleanSlot(room.playerA);
+    cleanSlot(room.playerB);
     this.timers.delete(room.id);
     this.rooms.delete(room.id);
   }
@@ -794,10 +1030,8 @@ export class GameService {
     const room = this.getRoomByUser(userId);
     if (!room || room.phase === 'finished') return;
 
-    const player = room.playerA.userId === userId ? room.playerA as PlayerSlot : null;
-    const playerB = !isBot(room.playerB) && room.playerB.userId === userId ? room.playerB : null;
-    const target = player || playerB;
-    if (!target || isBot(target)) return;
+    const target = this.findPlayerSlot(room, userId);
+    if (!target) return;
 
     target.connected = false;
     target.disconnectedAt = Date.now();
@@ -818,10 +1052,8 @@ export class GameService {
     const room = this.rooms.get(matchId);
     if (!room) return false;
 
-    const player = room.playerA.userId === userId ? room.playerA as PlayerSlot : null;
-    const playerB = !isBot(room.playerB) && room.playerB.userId === userId ? room.playerB : null;
-    const target = player || playerB;
-    if (!target || isBot(target)) return false;
+    const target = this.findPlayerSlot(room, userId);
+    if (!target) return false;
 
     target.socket = socket;
     target.connected = true;
@@ -832,6 +1064,20 @@ export class GameService {
     this.emitToSide(room, otherSide, 'match:opponent_reconnected', undefined);
 
     return true;
+  }
+
+  /** Find the PlayerSlot for a userId, searching team players if needed. */
+  private findPlayerSlot(room: GameRoom, userId: string): PlayerSlot | null {
+    for (const slot of [room.playerA, room.playerB]) {
+      if (isBot(slot)) continue;
+      if (isTeam(slot)) {
+        const found = slot.players.find(p => p.userId === userId);
+        if (found) return found;
+      } else if (slot.userId === userId) {
+        return slot;
+      }
+    }
+    return null;
   }
 
   // ---------- Utility ----------
