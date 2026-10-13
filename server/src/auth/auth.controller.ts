@@ -1,0 +1,61 @@
+import {
+  Controller, Post, Get, Delete, Body, UseGuards, Req, Param, Headers,
+} from '@nestjs/common';
+import { Request } from 'express';
+import { AuthService } from './auth.service';
+import { SignupDto } from './dto/signup.dto';
+import { LoginDto } from './dto/login.dto';
+import { RefreshDto } from './dto/refresh.dto';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('signup')
+  signup(
+    @Body() dto: SignupDto,
+    @Headers('x-device-name') deviceName: string,
+  ) {
+    return this.authService.signup(dto, deviceName);
+  }
+
+  @Post('login')
+  login(
+    @Body() dto: LoginDto,
+    @Headers('x-device-name') deviceName: string,
+  ) {
+    return this.authService.login(dto, deviceName);
+  }
+
+  @Post('refresh')
+  @UseGuards(JwtAuthGuard)
+  refresh(
+    @Body() dto: RefreshDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.authService.refresh(dto.refresh_token, userId);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  logout(@CurrentUser('id') userId: string) {
+    return this.authService.logout(userId);
+  }
+
+  @Get('sessions')
+  @UseGuards(JwtAuthGuard)
+  getSessions(@CurrentUser('id') userId: string) {
+    return this.authService.getSessions(userId);
+  }
+
+  @Delete('sessions/:id')
+  @UseGuards(JwtAuthGuard)
+  deleteSession(
+    @CurrentUser('id') userId: string,
+    @Param('id') sessionId: string,
+  ) {
+    return this.authService.deleteSession(userId, sessionId);
+  }
+}

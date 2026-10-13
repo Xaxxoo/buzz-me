@@ -1,0 +1,12 @@
+export { User } from './user.entity';
+export { DeviceSession } from './device-session.entity';
+export { University } from './university.entity';
+export { Team } from './team.entity';
+export { TeamMember } from './team-member.entity';
+export { Challenge } from './challenge.entity';
+export { Match } from './match.entity';
+export { MatchParticipant } from './match-participant.entity';
+export { Round } from './round.entity';
+export { Question } from './question.entity';
+export { Category } from './category.entity';
+export { LeaderboardEntry } from './leaderboard-entry.entity';

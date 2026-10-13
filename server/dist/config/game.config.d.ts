@@ -1,0 +1,15 @@
+export declare const ROUNDS = 8;
+export declare const DAILY_QUESTIONS = 10;
+export declare const BUZZ_WINDOW_MS = 4500;
+export declare const ANSWER_WINDOW_S = 6;
+export declare const BONUS_WINDOW_S = 8;
+export declare const WORD_BASE_DELAY_MS = 150;
+export declare const WORD_CHAR_DELAY_MS = 22;
+export declare const PUNCTUATION_PAUSE_MS = 240;
+export declare const ELO_K_FACTOR = 32;
+export declare const STARTING_RATING = 1000;
+export declare const RECONNECT_WINDOW_MS = 30000;
+export declare const MATCHMAKING_TIMEOUT_MS = 20000;
+export declare const MATCHMAKING_TICK_MS = 2000;
+export declare const MIN_BUZZ_TIME_MS = 50;
+export declare const RATING_RANGE_INITIAL = 200;

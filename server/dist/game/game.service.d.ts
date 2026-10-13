@@ -1,0 +1,60 @@
+import { Repository } from 'typeorm';
+import { Socket } from 'socket.io';
+import { GameRoom } from './types/game-room';
+import { ScoringService } from './scoring.service';
+import { QuestionsService } from '../questions/questions.service';
+import { User } from '../entities/user.entity';
+import { Match } from '../entities/match.entity';
+import { MatchParticipant } from '../entities/match-participant.entity';
+import { Round } from '../entities/round.entity';
+export declare class GameService {
+    private scoring;
+    private questionsService;
+    private userRepo;
+    private matchRepo;
+    private participantRepo;
+    private roundRepo;
+    private readonly logger;
+    private rooms;
+    private userRooms;
+    private timers;
+    constructor(scoring: ScoringService, questionsService: QuestionsService, userRepo: Repository<User>, matchRepo: Repository<Match>, participantRepo: Repository<MatchParticipant>, roundRepo: Repository<Round>);
+    getRoom(roomId: string): GameRoom | undefined;
+    getRoomByUser(userId: string): GameRoom | undefined;
+    createSoloRoom(socket: Socket, user: {
+        id: string;
+        username: string;
+    }): Promise<GameRoom>;
+    createQuickRoom(socketA: Socket, userA: {
+        id: string;
+        username: string;
+    }, socketB: Socket, userB: {
+        id: string;
+        username: string;
+    }): Promise<GameRoom>;
+    private scheduleTimer;
+    private bumpEpoch;
+    private emitToRoom;
+    private emitToSide;
+    private startCountdown;
+    private nextRound;
+    private readNextWord;
+    private openBuzzWindow;
+    handleBuzz(room: GameRoom, userId: string, timestamp: number): void;
+    handleAnswer(room: GameRoom, side: 'a' | 'b', optionIndex: number): void;
+    private startRebound;
+    handleRebound(room: GameRoom, side: 'a' | 'b', optionIndex: number): void;
+    private startBonus;
+    handleBonus(room: GameRoom, side: 'a' | 'b', optionIndex: number): void;
+    private endRound;
+    private finishMatch;
+    private persistMatch;
+    private cleanupRoom;
+    private planBotBuzz;
+    private botBuzz;
+    private botRebound;
+    private botBonus;
+    handleDisconnect(userId: string): void;
+    handleReconnect(socket: Socket, userId: string, matchId: string): boolean;
+    private shuffleOptions;
+}
