@@ -8,7 +8,7 @@ import {
 } from './save';
 import { pickRival, school } from './schools';
 import { setMuted, sfx } from './sfx';
-import type { QA, Question, School, Team } from './types';
+import type { QA, Question, School, Team, TeamData, LobbyState } from './types';
 
 /*
  * The game engine. It owns every timer and all match state, and publishes an immutable
@@ -19,7 +19,7 @@ import type { QA, Question, School, Team } from './types';
  * from a room server and keep the rest.
  */
 
-export type Screen = 's-title' | 's-pick' | 's-vs' | 's-match' | 's-result' | 's-stats' | 's-login' | 's-signup' | 's-leaderboard';
+export type Screen = 's-title' | 's-pick' | 's-vs' | 's-match' | 's-result' | 's-stats' | 's-login' | 's-signup' | 's-leaderboard' | 's-team';
 export type Took = 'you' | 'rival' | 'none';
 
 export interface WordView { text: string; late: boolean; delay?: number }
@@ -86,6 +86,12 @@ export interface GameState {
   finding: boolean;
   findElapsed: number;
   opponentName: string | null;
+  /* teams */
+  teamView: 'list' | 'create' | 'lobby';
+  myTeams: TeamData[];
+  activeTeam: TeamData | null;
+  lobby: LobbyState | null;
+  teamFinding: boolean;
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -109,6 +115,7 @@ const initial = (): GameState => ({
   save: defaultSave(),
   selectedCategories: [], difficulty: 'medium',
   matchMode: 'local', matchId: null, finding: false, findElapsed: 0, opponentName: null,
+  teamView: 'list', myTeams: [], activeTeam: null, lobby: null, teamFinding: false,
 });
 
 export class GameEngine {
@@ -527,6 +534,38 @@ export class GameEngine {
     this.fillRest(); this.showAnswer(q);
     this.later(() => this.advance(), 1700);
   };
+
+  /* ---------- team navigation ---------- */
+  showTeams() { sfx.tap(); this.set({ screen: 's-team', teamView: 'list' }); }
+  showCreateTeam() { sfx.tap(); this.set({ teamView: 'create' }); }
+  showTeamLobby(team: TeamData) { sfx.tap(); this.set({ teamView: 'lobby', activeTeam: team, lobby: null, teamFinding: false }); }
+  setMyTeams(teams: TeamData[]) { this.set({ myTeams: teams }); }
+  backToTeamList() { sfx.tap(); this.set({ teamView: 'list', activeTeam: null, lobby: null, teamFinding: false }); }
+
+  /* ---------- team lobby event handlers ---------- */
+  onTeamLobbyUpdate(data: { teamId: string; teamName: string; inviteCode: string; members: { userId: string; username: string; rating: number; ready: boolean; isCaptain: boolean }[] }) {
+    this.set({
+      lobby: {
+        teamId: data.teamId,
+        teamName: data.teamName,
+        inviteCode: data.inviteCode,
+        members: data.members,
+      },
+    });
+  }
+
+  onTeamFinding() {
+    this.set({ teamFinding: true });
+  }
+
+  onTeamMatchFound(data: { match_id: string; opponent_team: string }) {
+    // The match:found event will handle the actual transition
+    this.set({ teamFinding: false });
+  }
+
+  onTeamMatchTimeout() {
+    this.set({ teamFinding: false });
+  }
 
   /* ---------- online event handlers ---------- */
   onlineMatchFound(data: { match_id: string; opponent: { username: string; rating: number; university?: { name: string; short_name: string; color_a: string; color_b: string; pattern: string } }; you_side: string }) {

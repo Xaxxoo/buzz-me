@@ -55,6 +55,26 @@ export class SocketClient {
     this.socket?.emit('match:answer', { option_index: index });
   }
 
+  /* ---------- team client→server ---------- */
+  joinTeamLobby(teamId: string) {
+    this.socket?.emit('team:join_lobby', { team_id: teamId });
+  }
+  leaveTeamLobby(teamId: string) {
+    this.socket?.emit('team:leave_lobby', { team_id: teamId });
+  }
+  teamReady(teamId: string, ready: boolean) {
+    this.socket?.emit('team:ready', { team_id: teamId, ready });
+  }
+  teamStartFind(teamId: string, categories?: string[]) {
+    this.socket?.emit('team:start_find', { team_id: teamId, categories });
+  }
+  teamCancelFind(teamId: string) {
+    this.socket?.emit('team:cancel_find', { team_id: teamId });
+  }
+  teamChallenge(teamId: string, opponentCode: string) {
+    this.socket?.emit('team:challenge', { team_id: teamId, opponent_code: opponentCode });
+  }
+
   /* ---------- server→client ---------- */
   private bindEvents() {
     const s = this.socket;
@@ -78,6 +98,12 @@ export class SocketClient {
     s.on('match:opponent_forfeited', () => this.engine.onlineOpponentForfeited());
     s.on('matchmaking:status', d => this.engine.onlineMatchmakingStatus(d));
     s.on('matchmaking:timeout', d => this.engine.onlineMatchmakingTimeout(d));
+
+    // Team events
+    s.on('team:lobby_update', d => this.engine.onTeamLobbyUpdate(d));
+    s.on('team:finding', () => this.engine.onTeamFinding());
+    s.on('team:match_found', d => this.engine.onTeamMatchFound(d));
+    s.on('team:match_timeout', () => this.engine.onTeamMatchTimeout());
 
     s.on('connect_error', async () => {
       // Try refreshing the token

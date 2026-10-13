@@ -6,6 +6,12 @@ export interface ClientToServerEvents {
   'match:buzz': (data: { timestamp: number }) => void;
   'match:answer': (data: { option_index: number }) => void;
   'match:reconnect': (data: { match_id: string }) => void;
+  'team:join_lobby': (data: { team_id: string }) => void;
+  'team:leave_lobby': (data: { team_id: string }) => void;
+  'team:ready': (data: { team_id: string; ready: boolean }) => void;
+  'team:start_find': (data: { team_id: string; categories?: string[] }) => void;
+  'team:cancel_find': (data: { team_id: string }) => void;
+  'team:challenge': (data: { team_id: string; opponent_code: string }) => void;
 }
 
 export interface OpponentInfo {
@@ -48,4 +54,23 @@ export interface ServerToClientEvents {
   'matchmaking:status': (data: { position: number; elapsed_ms: number }) => void;
   'matchmaking:timeout': (data: { offer_bot: boolean }) => void;
   'error': (data: { message: string }) => void;
+  'team:lobby_update': (data: TeamLobbyUpdate) => void;
+  'team:finding': () => void;
+  'team:match_found': (data: { match_id: string; opponent_team: string }) => void;
+  'team:match_timeout': () => void;
+}
+
+export interface TeamLobbyMemberInfo {
+  userId: string;
+  username: string;
+  rating: number;
+  ready: boolean;
+  isCaptain: boolean;
+}
+
+export interface TeamLobbyUpdate {
+  teamId: string;
+  teamName: string;
+  inviteCode: string;
+  members: TeamLobbyMemberInfo[];
 }

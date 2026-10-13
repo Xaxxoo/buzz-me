@@ -13,6 +13,37 @@ export interface School {
   pat: Pattern;
 }
 
+export interface TeamMemberData {
+  userId: string;
+  username: string;
+  rating: number;
+  role: 'captain' | 'member';
+}
+
+export interface TeamData {
+  id: string;
+  name: string;
+  invite_code: string;
+  captain_id: string;
+  university_id: string | null;
+  members: TeamMemberData[];
+}
+
+export interface LobbyMemberState {
+  userId: string;
+  username: string;
+  rating: number;
+  ready: boolean;
+  isCaptain: boolean;
+}
+
+export interface LobbyState {
+  teamId: string;
+  teamName: string;
+  inviteCode: string;
+  members: LobbyMemberState[];
+}
+
 /** A question and its options. The first option is always the right one. */
 export interface QA {
   t: string;
