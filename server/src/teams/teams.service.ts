@@ -36,6 +36,14 @@ export class TeamsService {
     return team;
   }
 
+  async findByUser(userId: string) {
+    const memberships = await this.memberRepo.find({
+      where: { user_id: userId },
+      relations: ['team', 'team.members', 'team.members.user', 'team.university', 'team.captain'],
+    });
+    return memberships.map(m => m.team);
+  }
+
   async findOne(teamId: string) {
     const team = await this.teamRepo.findOne({
       where: { id: teamId },
@@ -51,6 +59,8 @@ export class TeamsService {
       relations: ['members'],
     });
     if (!team) throw new NotFoundException('Invalid invite code');
+
+    if (team.members.length >= 3) throw new ConflictException('Team is full (max 3)');
 
     const existing = team.members?.find((m) => m.user_id === userId);
     if (existing) throw new ConflictException('Already a member');

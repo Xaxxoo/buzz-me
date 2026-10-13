@@ -19,6 +19,11 @@ export class TeamsController {
     return this.service.create(userId, dto);
   }
 
+  @Get('mine')
+  mine(@CurrentUser('id') userId: string) {
+    return this.service.findByUser(userId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
