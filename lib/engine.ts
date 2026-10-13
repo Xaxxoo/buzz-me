@@ -77,6 +77,9 @@ export interface GameState {
   result: MatchResult | DailyResult | null;
   resultKey: number;
   save: Save;
+  /* categories & difficulty */
+  selectedCategories: string[];
+  difficulty: 'easy' | 'medium' | 'hard';
   /* online */
   matchMode: 'local' | 'online';
   matchId: string | null;
@@ -104,6 +107,7 @@ const initial = (): GameState => ({
   zone: 'buzz', buzzLive: false, window: { key: 0, secs: 0 }, ask: null, rivalView: null, seat: null, flash: null,
   result: null, resultKey: 0,
   save: defaultSave(),
+  selectedCategories: [], difficulty: 'medium',
   matchMode: 'local', matchId: null, finding: false, findElapsed: 0, opponentName: null,
 });
 
@@ -234,6 +238,18 @@ export class GameEngine {
     return kept ? school(String(kept.name).slice(0, 60), String(kept.country || 'Your school')) : null;
   }
   toggleMute() { const muted = !this.state.muted; setMuted(muted); this.set({ muted }); sfx.tap(); }
+  setCategories(cats: string[]) { this.set({ selectedCategories: cats }); }
+  setDifficulty(d: 'easy' | 'medium' | 'hard') { this.set({ difficulty: d }); }
+
+  private botParams() {
+    const p = {
+      easy:   { buzzChance: 0.55, knowChance: 0.55, speedMin: 0.75, speedMax: 1.40, stealChance: 0.30, bonusChance: 0.35 },
+      medium: { buzzChance: 0.72, knowChance: 0.74, speedMin: 0.60, speedMax: 1.22, stealChance: 0.50, bonusChance: 0.55 },
+      hard:   { buzzChance: 0.85, knowChance: 0.88, speedMin: 0.45, speedMax: 0.95, stealChance: 0.65, bonusChance: 0.70 },
+    };
+    return p[this.state.difficulty];
+  }
+
   /** Back to the menu. A school that was tapped in the picker but never confirmed is dropped. */
   menu() { this.cut(); this.phase = 'idle'; sfx.tap(); this.set({ screen: 's-title', pending: null, you: this.keptSchool() }); }
   showStats() { sfx.tap(); this.set({ screen: 's-stats' }); }
@@ -283,7 +299,10 @@ export class GameEngine {
     const you = this.state.you;
     if (!you) return this.openPicker(null);
     this.cut();
-    this.qs = shuffle(QUESTIONS).slice(0, ROUNDS);
+    const pool = this.state.selectedCategories.length
+      ? QUESTIONS.filter(q => this.state.selectedCategories.includes(q.c))
+      : QUESTIONS;
+    this.qs = shuffle(pool).slice(0, ROUNDS);
     this.resetBoard('match', this.qs.length, pickRival(you));
     this.set({ screen: 's-vs' });
     sfx.slam(); setTimeout(() => sfx.slam(), 180);
@@ -313,13 +332,14 @@ export class GameEngine {
       tag: q.c, bonusCard: false, words: [], answer: null, stamp: null,
       zone: 'buzz', buzzLive: true, ask: null, rivalView: null, window: { key: this.key(), secs: 0 },
       status: daily
-        ? `Question ${qi + 1} of ${this.qs.length}. The earlier you buzz, the more it’s worth.`
+        ? `Question ${qi + 1} of ${this.qs.length}. The earlier you buzz, the more it's worth.`
         : `Toss-up ${qi + 1} of ${this.qs.length}. Buzz as soon as you know it.`,
     });
-    /* The rival knows about three in four, and commits somewhere between 60% of the question and a few seconds after it. */
-    const at = rand(0.6, 1.22);
-    this.rivalPlan = daily || Math.random() >= 0.72 ? null
-      : { idx: at <= 1 ? Math.max(6, Math.ceil(at * this.all.length)) : Infinity, late: at > 1 ? 500 + ((at - 1) / 0.22) * 3400 : null };
+    /* The rival decides whether to buzz, based on difficulty. */
+    const bp = this.botParams();
+    const at = rand(bp.speedMin, bp.speedMax);
+    this.rivalPlan = daily || Math.random() >= bp.buzzChance ? null
+      : { idx: at <= 1 ? Math.max(6, Math.ceil(at * this.all.length)) : Infinity, late: at > 1 ? 500 + ((at - 1) / (bp.speedMax - 1)) * 3400 : null };
     this.later(() => this.readTick(), 800);
   }
 
@@ -337,7 +357,7 @@ export class GameEngine {
   private openWindow() {
     this.phase = 'open';
     this.meter(OPEN_MS / 1000);
-    this.status('That’s the whole question. Buzz now for 10.');
+    this.status(`That\u2019s the whole question. Buzz now for 10.`);
     if (this.rivalPlan && this.rivalPlan.late != null) this.later(() => this.rivalBuzz(), this.rivalPlan.late);
     this.later(() => {
       this.cut();
@@ -367,8 +387,8 @@ export class GameEngine {
     this.set({
       buzzLive: false, window: { key: this.key(), secs: 0 },
       status: daily
-        ? `Buzzed ${Math.round(this.heard * 100)}% in. Worth ${10 + Math.round((1 - this.heard) * 10)} if you’re right` + (this.early ? ', −5 if not.' : '.')
-        : this.early ? 'Early buzz. 15 if you’re right, −5 if not.' : 'Your buzzer. 10 points if you’re right.',
+        ? `Buzzed ${Math.round(this.heard * 100)}% in. Worth ${10 + Math.round((1 - this.heard) * 10)} if you're right` + (this.early ? ', −5 if not.' : '.')
+        : this.early ? `Early buzz. 15 if you\u2019re right, \u22125 if not.` : `Your buzzer. 10 points if you\u2019re right.`,
     });
     this.later(() => this.ask(this.q!, { secs: 6, done: daily ? this.dailyAnswer : this.tossResult }), 700);
   }
@@ -398,7 +418,7 @@ export class GameEngine {
     this.fillRest(); this.seat('rival');
     this.rivalPanel(rival.short + ' hears the full question');
     this.later(() => {
-      if (Math.random() < 0.5) {
+      if (Math.random() < this.botParams().stealChance) {
         this.score('rival', 10); this.took('rival');
         this.rivalPanel(rival.short + ' answers', q.o[0], 'right');
         this.showAnswer(q); sfx.theirs(); this.status(`${rival.short} steals it. +10 to them.`);
@@ -406,7 +426,7 @@ export class GameEngine {
       } else {
         this.took('none');
         this.rivalPanel(rival.short + ' passes', 'No answer');
-        this.showAnswer(q); this.status(`${rival.short} couldn’t take it either.`);
+        this.showAnswer(q); this.status(`${rival.short} couldn\u2019t take it either.`);
         this.later(() => this.advance(), 2000);
       }
     }, 1600);
@@ -423,7 +443,7 @@ export class GameEngine {
     this.set({ buzzLive: false, window: { key: this.key(), secs: 0 }, status: `${rival.short} buzzed${early ? ' early' : ''}.` });
     this.rivalPanel(rival.short + ' got there first');
     this.later(() => {
-      if (Math.random() < 0.74) {
+      if (Math.random() < this.botParams().knowChance) {
         const pts = early ? 15 : 10;
         this.score('rival', pts); this.took('rival');
         this.rivalPanel(rival.short + ' answers', q.o[0], 'right');
@@ -482,7 +502,7 @@ export class GameEngine {
       this.rivalPanel(name + ' takes the bonus');
       this.status(`Bonus question for ${name}.`);
       this.later(() => {
-        if (Math.random() < 0.55) { this.score('rival', 10); this.rivalPanel(name + ' answers', b.o[0], 'right'); sfx.theirs(); this.status(`${name} takes the bonus. +10 to them.`); }
+        if (Math.random() < this.botParams().bonusChance) { this.score('rival', 10); this.rivalPanel(name + ' answers', b.o[0], 'right'); sfx.theirs(); this.status(`${name} takes the bonus. +10 to them.`); }
         else { this.rivalPanel(name + ' answers', pick(b.o.slice(1)), 'wrong'); sfx.tap(); this.status(`${name} misses the bonus.`); }
         this.showAnswer(b);
         this.later(() => this.advance(), 2000);
@@ -753,7 +773,7 @@ export class GameEngine {
         kind: 'daily', you, date: d.date, score: d.score, marks: d.marks, streak: n,
         verdict: 'Daily challenge, ' + niceDate(d.date),
         cells: [['Right', `${d.right}/${DAILY}`], ['Streak', n === 1 ? '1 day' : n + ' days'], ['Earliest buzz', pct(d.best)]],
-        dare: (fresh ? (d.froze ? 'Your free miss for the week kept the streak alive. ' : '') : 'You’ve played today’s set. ') + `Next set in ${nextIn()}.`,
+        dare: (fresh ? (d.froze ? 'Your free miss for the week kept the streak alive. ' : '') : `You\u2019ve played today\u2019s set. `) + `Next set in ${nextIn()}.`,
       },
     });
     if (!fresh) return;
