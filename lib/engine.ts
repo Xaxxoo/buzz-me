@@ -1,8 +1,9 @@
+import type { AuthClient } from './auth';
 import { DAILY, OPEN_MS, ROUNDS } from './config';
 import { confetti } from './confetti';
 import { QUESTIONS } from './data/questions';
 import {
-  bumpStreak, dailySet, defaultSave, liveStreak, loadSave, nextIn, niceDate, record, today, writeSave,
+  bumpStreak, dailySet, defaultSave, liveStreak, loadSave, loadServerSave, nextIn, niceDate, record, syncSave, today, writeSave,
   type Mark, type Save,
 } from './save';
 import { pickRival, school } from './schools';
@@ -18,7 +19,7 @@ import type { QA, Question, School, Team } from './types';
  * from a room server and keep the rest.
  */
 
-export type Screen = 's-title' | 's-pick' | 's-vs' | 's-match' | 's-result' | 's-stats';
+export type Screen = 's-title' | 's-pick' | 's-vs' | 's-match' | 's-result' | 's-stats' | 's-login' | 's-signup' | 's-leaderboard';
 export type Took = 'you' | 'rival' | 'none';
 
 export interface WordView { text: string; late: boolean; delay?: number }
@@ -76,6 +77,12 @@ export interface GameState {
   result: MatchResult | DailyResult | null;
   resultKey: number;
   save: Save;
+  /* online */
+  matchMode: 'local' | 'online';
+  matchId: string | null;
+  finding: boolean;
+  findElapsed: number;
+  opponentName: string | null;
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -97,6 +104,7 @@ const initial = (): GameState => ({
   zone: 'buzz', buzzLive: false, window: { key: 0, secs: 0 }, ask: null, rivalView: null, seat: null, flash: null,
   result: null, resultKey: 0,
   save: defaultSave(),
+  matchMode: 'local', matchId: null, finding: false, findElapsed: 0, opponentName: null,
 });
 
 export class GameEngine {
@@ -104,6 +112,7 @@ export class GameEngine {
   private listeners = new Set<() => void>();
   private epoch = 0;
   private keys = 0;
+  auth: AuthClient | null = null;
 
   /* working state for the question in play; none of it is rendered directly */
   private save: Save = defaultSave();
@@ -120,6 +129,8 @@ export class GameEngine {
   private marks: Mark[] = [];
   private day = '';
   private asking: { qa: QA; done: (ok: boolean, text: string | null) => void; over: boolean } | null = null;
+  private mySide: 'a' | 'b' = 'a';
+  private findTimer: ReturnType<typeof setInterval> | null = null;
 
   /* ---------- store plumbing ---------- */
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
@@ -135,7 +146,9 @@ export class GameEngine {
   private cut() { this.epoch++; }
   private commit() {
     writeSave(this.save);
-    this.set({ save: { ...this.save, cats: { ...this.save.cats }, streak: { ...this.save.streak } } });
+    const snap = { ...this.save, cats: { ...this.save.cats }, streak: { ...this.save.streak } };
+    this.set({ save: snap });
+    if (this.auth?.getSnapshot().status === 'authenticated') syncSave(this.auth.api, snap);
   }
 
   /* ---------- small view helpers ---------- */
@@ -204,9 +217,14 @@ export class GameEngine {
 
   /* ---------- navigation ---------- */
   /** Runs once in the browser, after the first render, so server and client markup match. */
-  hydrate() {
+  async hydrate() {
     if (this.state.hydrated) return;
     this.save = loadSave();
+    // If authenticated, try loading from server
+    if (this.auth?.getSnapshot().status === 'authenticated') {
+      const remote = await loadServerSave(this.auth.api);
+      if (remote) { this.save = remote; writeSave(remote); }
+    }
     this.set({ hydrated: true, you: this.keptSchool() });
     this.commit();
   }
@@ -231,8 +249,24 @@ export class GameEngine {
     this.commit();
     if (this.state.pending === 'daily') { this.set({ pending: null }); this.startDaily(); } else this.startMatch();
   }
-  rematch() { sfx.tap(); this.startMatch(); }
+  rematch() { sfx.tap(); this.state.matchMode === 'online' ? this.findQuickMatch() : this.startMatch(); }
   daily() { sfx.tap(); this.startDaily(); }
+  showLogin() { sfx.tap(); this.set({ screen: 's-login' }); }
+  showSignup() { sfx.tap(); this.set({ screen: 's-signup' }); }
+  showLeaderboard() { sfx.tap(); this.set({ screen: 's-leaderboard' }); }
+
+  /* ---------- online matchmaking ---------- */
+  findQuickMatch() {
+    this.cut();
+    this.phase = 'idle';
+    this.set({ screen: 's-match', finding: true, findElapsed: 0, matchMode: 'online', matchId: null, opponentName: null, status: 'Finding opponent\u2026', zone: 'none', buzzLive: false, tag: '', words: [], answer: null, bonusCard: false });
+    this.findTimer = setInterval(() => { this.set({ findElapsed: this.state.findElapsed + 1 }); }, 1000);
+  }
+  cancelFind() {
+    if (this.findTimer) { clearInterval(this.findTimer); this.findTimer = null; }
+    this.set({ finding: false });
+    this.menu();
+  }
 
   /* ---------- match flow ---------- */
   private resetBoard(mode: 'match' | 'daily', total: number, rival: School | null) {
@@ -473,6 +507,243 @@ export class GameEngine {
     this.fillRest(); this.showAnswer(q);
     this.later(() => this.advance(), 1700);
   };
+
+  /* ---------- online event handlers ---------- */
+  onlineMatchFound(data: { match_id: string; opponent: { username: string; rating: number; university?: { name: string; short_name: string; color_a: string; color_b: string; pattern: string } }; you_side: string }) {
+    if (this.findTimer) { clearInterval(this.findTimer); this.findTimer = null; }
+    this.mySide = data.you_side as 'a' | 'b';
+    const opp = data.opponent;
+    const rival: School = opp.university
+      ? { id: opp.username, name: opp.university.name, country: '', short: opp.university.short_name, a: opp.university.color_a, b: opp.university.color_b, pat: opp.university.pattern as any }
+      : { id: opp.username, name: opp.username, country: '', short: opp.username.slice(0, 10), a: '#1763B8', b: '#0E4D8E', pat: 'chief' };
+    this.tally = { won: 0, bonus: 0, best: null };
+    this.set({
+      finding: false, matchMode: 'online', matchId: data.match_id, opponentName: opp.username,
+      rival, screen: 's-vs',
+    });
+    sfx.slam(); setTimeout(() => sfx.slam(), 180);
+  }
+
+  onlineCountdown(data: { seconds: number }) {
+    this.status(`Match starts in ${data.seconds}\u2026`);
+    if (data.seconds <= 1) this.later(() => this.set({ screen: 's-match' }), 900);
+  }
+
+  onlineNewQuestion(data: { round: number; total: number; category: string }) {
+    this.cut();
+    this.phase = 'reading';
+    this.all = [];
+    this.ri = 0;
+    this.full = false;
+    this.early = false;
+    this.heard = 1;
+    this.rivalPlan = null;
+    this.set({
+      screen: 's-match', qi: data.round - 1, total: data.total, boardKey: data.round === 1 ? this.key() : this.state.boardKey,
+      scoreYou: data.round === 1 ? 0 : this.state.scoreYou, scoreRival: data.round === 1 ? 0 : this.state.scoreRival,
+      took: data.round === 1 ? [] : this.state.took,
+      tag: data.category, bonusCard: false, words: [], answer: null, stamp: null,
+      zone: 'buzz', buzzLive: true, ask: null, rivalView: null,
+      window: { key: this.key(), secs: 0 },
+      status: `Toss-up ${data.round} of ${data.total}. Buzz as soon as you know it.`,
+    });
+  }
+
+  onlineWord(data: { word: string; index: number; total: number }) {
+    this.all[data.index] = data.word;
+    this.ri = data.index + 1;
+    this.addWord(data.word);
+    sfx.word();
+    this.full = data.index >= data.total - 1;
+  }
+
+  onlineBuzzOpen(data: { duration_ms: number }) {
+    this.phase = 'open';
+    this.meter(data.duration_ms / 1000);
+    this.status('That\u2019s the whole question. Buzz now for 10.');
+  }
+
+  onlineBuzzed(data: { side: string; username: string }) {
+    this.cut();
+    const isMe = data.side === this.mySide;
+    this.early = !this.full;
+    if (isMe) this.heard = this.ri / Math.max(this.all.length, 1);
+    this.phase = isMe ? 'answer' : 'rival';
+    const team: Team = isMe ? 'you' : 'rival';
+    if (isMe) sfx.buzz(); else sfx.rbuzz();
+    this.flash(team);
+    this.stamp(data.username + ' buzzed', team);
+    this.seat(team);
+    this.set({
+      buzzLive: false, window: { key: this.key(), secs: 0 },
+      status: isMe
+        ? (this.early ? 'Early buzz. 15 if you\u2019re right, \u22125 if not.' : 'Your buzzer. 10 points if you\u2019re right.')
+        : `${data.username} buzzed${this.early ? ' early' : ''}.`,
+    });
+    if (!isMe) this.rivalPanel(data.username + ' is answering');
+  }
+
+  onlineAsk(data: { options: string[]; seconds: number; struck?: string }) {
+    this.phase = 'answer';
+    this.asking = {
+      qa: { t: '', o: data.options },
+      done: () => {}, // answer result comes from server
+      over: false,
+    };
+    this.set({
+      zone: 'opts', rivalView: null,
+      ask: {
+        key: this.key(), secs: data.seconds, paused: false,
+        options: data.options.map(text => ({
+          text, mark: text === data.struck ? 'struck' as const : '' as const,
+          disabled: text === data.struck,
+        })),
+      },
+    });
+    for (let s = 3; s >= 1; s--) this.later(() => sfx.tick(), (data.seconds - s) * 1000);
+  }
+
+  onlineAnswerResult(data: { correct: boolean; correct_answer: string; points: number; score_a: number; score_b: number }) {
+    this.cut();
+    const myScore = this.mySide === 'a' ? data.score_a : data.score_b;
+    const theirScore = this.mySide === 'a' ? data.score_b : data.score_a;
+    this.set({ scoreYou: myScore, scoreRival: theirScore });
+    if (this.asking) this.asking.over = true;
+    // Mark the correct option in the UI
+    const view = this.state.ask;
+    if (view) {
+      this.set({
+        ask: { ...view, paused: true, options: view.options.map(o => ({ ...o, disabled: true, mark: o.text === data.correct_answer ? 'right' as const : o.mark })) },
+      });
+    }
+    this.fillRest();
+    this.set({ answer: data.correct_answer });
+    if (data.correct && this.phase === 'answer') {
+      sfx.right(); this.cheer(46);
+      this.status(data.points >= 15 ? 'Right, and early. +15.' : 'Right. +10.');
+      this.took('you');
+      this.tally.won++;
+    } else if (data.correct) {
+      sfx.theirs();
+    }
+  }
+
+  onlineRebound(data: { options: string[]; seconds: number; struck: string }) {
+    this.fillRest();
+    this.phase = 'answer';
+    this.early = false;
+    this.stamp('Steal for 10', 'you');
+    this.onlineAsk({ options: data.options, seconds: data.seconds, struck: data.struck });
+  }
+
+  onlineBonus(data: { text: string; options: string[]; seconds: number; for_side: string }) {
+    this.cut();
+    this.phase = 'bonus';
+    const forMe = data.for_side === this.mySide;
+    const name = forMe ? (this.state.you?.short ?? 'You') : (this.state.opponentName ?? 'Opponent');
+    this.set({
+      bonusCard: true, tag: 'Bonus for ' + name, answer: null,
+      words: data.text.split(' ').map((text, i) => ({ text, late: false, delay: i * 25 })),
+    });
+    if (forMe) {
+      this.set({ zone: 'none', ask: null, rivalView: null, status: 'Bonus question. 10 points, no buzzer.' });
+      this.later(() => this.onlineAsk({ options: data.options, seconds: data.seconds }), 800);
+    } else {
+      this.rivalPanel(name + ' takes the bonus');
+      this.status(`Bonus question for ${name}.`);
+    }
+  }
+
+  onlineBonusResult(data: { correct: boolean; correct_answer: string; points: number; score_a: number; score_b: number }) {
+    this.cut();
+    const myScore = this.mySide === 'a' ? data.score_a : data.score_b;
+    const theirScore = this.mySide === 'a' ? data.score_b : data.score_a;
+    this.set({ scoreYou: myScore, scoreRival: theirScore, answer: data.correct_answer });
+    if (this.asking) this.asking.over = true;
+    const view = this.state.ask;
+    if (view) {
+      this.set({
+        ask: { ...view, paused: true, options: view.options.map(o => ({ ...o, disabled: true, mark: o.text === data.correct_answer ? 'right' as const : o.mark })) },
+      });
+    }
+    if (data.correct && this.phase === 'bonus') {
+      sfx.right(); this.cheer(30);
+      this.tally.bonus++;
+      this.status('Bonus taken. +10.');
+    } else if (data.correct) {
+      sfx.theirs();
+    } else {
+      sfx.wrong();
+      this.status('Bonus missed.');
+    }
+  }
+
+  onlineRoundEnd(data: { round: number; score_a: number; score_b: number; took: string }) {
+    const myScore = this.mySide === 'a' ? data.score_a : data.score_b;
+    const theirScore = this.mySide === 'a' ? data.score_b : data.score_a;
+    this.set({ scoreYou: myScore, scoreRival: theirScore });
+    const t = data.took === this.mySide ? 'you' as const : data.took === 'none' ? 'none' as const : 'rival' as const;
+    this.took(t);
+  }
+
+  onlineMatchEnd(data: { match_id: string; score_a: number; score_b: number; rating_before: number; rating_after: number; rating_delta: number; rounds_won: number; total_rounds: number }) {
+    this.cut();
+    this.phase = 'done';
+    const you = this.state.you!, rival = this.state.rival!;
+    const scoreYou = this.mySide === 'a' ? data.score_a : data.score_b;
+    const scoreRival = this.mySide === 'a' ? data.score_b : data.score_a;
+    const d = scoreYou - scoreRival;
+    this.save.rating = data.rating_after;
+    this.save.played++;
+    if (d > 0) this.save.won++; else if (d < 0) this.save.lost++; else this.save.drawn++;
+    this.commit();
+    this.set({
+      scoreYou, scoreRival,
+      screen: 's-result', resultKey: this.key(),
+      result: {
+        kind: 'match', you, rival, scoreYou, scoreRival,
+        verdict: d > 0 ? `${you.short} beat ${rival.short}` : d < 0 ? `${rival.short} beat ${you.short}` : `${you.short} and ${rival.short} drew`,
+        cells: [['Toss-ups', `${data.rounds_won}/${data.total_rounds}`], ['Bonuses', String(this.tally.bonus)], ['Earliest buzz', pct(this.tally.best)]],
+        rate: `Your rating: ${data.rating_after}, ${data.rating_delta < 0 ? 'down' : 'up'} ${Math.abs(data.rating_delta)}.`,
+        dare: d > 0 ? 'Can your school beat us?' : d < 0 ? 'Rematch and take it back.' : 'One more to settle it.',
+      },
+    });
+    if (d > 0) { sfx.win(); confetti.rain(this.colors(['#E8322C', '#1B1464'])); }
+    else if (d < 0) sfx.lose();
+    else sfx.theirs();
+  }
+
+  onlineOpponentDisconnected() {
+    this.status('Opponent disconnected. Waiting for them to return\u2026');
+  }
+  onlineOpponentReconnected() {
+    this.status('Opponent reconnected.');
+  }
+  onlineOpponentForfeited() {
+    this.status('Opponent forfeited.');
+  }
+
+  onlineMatchmakingStatus(data: { position: number; elapsed_ms: number }) {
+    this.set({ findElapsed: Math.round(data.elapsed_ms / 1000) });
+    this.status(`Finding opponent\u2026 ${Math.round(data.elapsed_ms / 1000)}s`);
+  }
+  onlineMatchmakingTimeout(_data: { offer_bot: boolean }) {
+    this.status('No opponents found. Try again or play locally.');
+    if (this.findTimer) { clearInterval(this.findTimer); this.findTimer = null; }
+    this.set({ finding: false });
+  }
+
+  /** Answer an online question by option index (sent to server). */
+  onlineAnswer(index: number) {
+    const view = this.state.ask;
+    if (!view || this.asking?.over) return;
+    const opt = view.options[index];
+    if (!opt || opt.disabled) return;
+    if (this.asking) this.asking.over = true;
+    this.set({
+      ask: { ...view, paused: true, options: view.options.map((o, i) => ({ ...o, disabled: true, mark: i === index ? 'wrong' as const : o.mark })) },
+    });
+  }
 
   private showDailyResult(fresh: boolean) {
     const d = this.save.daily!, you = this.state.you!, n = liveStreak(this.save);
