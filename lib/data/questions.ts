@@ -124,3 +124,10 @@ export const QUESTIONS: Question[] = [
     o: ['Wildebeest', 'Springbok', 'Impala', 'Eland'],
     b: { t: 'In which country is Serengeti National Park?', o: ['Tanzania', 'Kenya', 'Uganda', 'Zambia'] } },
 ];
+
+export const LOCAL_CATEGORIES = [...new Set(QUESTIONS.map(q => q.c))].sort();
+
+export function availableCount(cats: string[]): number {
+  if (cats.length === 0) return QUESTIONS.length;
+  return QUESTIONS.filter(q => cats.includes(q.c)).length;
+}
