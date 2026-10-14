@@ -37,9 +37,11 @@ interface Props {
 }
 
 type Tab = 'players' | 'universities';
+type Period = 'alltime' | 'weekly';
 
 export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
   const [tab, setTab] = useState<Tab>('players');
+  const [period, setPeriod] = useState<Period>('alltime');
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [universities, setUniversities] = useState<UniversityRow[]>([]);
   const [ownRank, setOwnRank] = useState<OwnRank | null>(null);
@@ -49,10 +51,10 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
   const [uniTotal, setUniTotal] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const fetchPlayers = useCallback(async (page: number, append: boolean) => {
+  const fetchPlayers = useCallback(async (page: number, append: boolean, p: Period) => {
     setLoading(true);
     try {
-      const res = await auth.api.get<{ items: PlayerRow[]; total: number }>(`/leaderboards/players?page=${page}&limit=20`);
+      const res = await auth.api.get<{ items: PlayerRow[]; total: number }>(`/leaderboards/players?page=${page}&limit=20&period=${p}`);
       setPlayers(prev => append ? [...prev, ...res.items] : res.items);
       setPlayerTotal(res.total);
       setPlayerPage(page);
@@ -81,10 +83,16 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
 
   useEffect(() => {
     if (!active) return;
-    fetchPlayers(1, false);
+    fetchPlayers(1, false, period);
     fetchUniversities(1, false);
     fetchOwnRank();
-  }, [active, fetchPlayers, fetchUniversities, fetchOwnRank]);
+  }, [active, period, fetchPlayers, fetchUniversities, fetchOwnRank]);
+
+  const switchPeriod = (p: Period) => {
+    setPeriod(p);
+    setPlayers([]);
+    setPlayerPage(1);
+  };
 
   return (
     <section className="screen enter flex-auto min-h-0 flex flex-col gap-3" id="s-leaderboard" hidden={!active}>
@@ -99,6 +107,10 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
 
       {tab === 'players' && (
         <div className="lb-list flex-auto min-h-0 overflow-y-auto flex flex-col gap-2 pb-2">
+          <div className="lb-period flex gap-1 shrink-0">
+            <button className={'btn ghost small' + (period === 'alltime' ? ' active' : '')} type="button" onClick={() => switchPeriod('alltime')}>All Time</button>
+            <button className={'btn ghost small' + (period === 'weekly' ? ' active' : '')} type="button" onClick={() => switchPeriod('weekly')}>This Week</button>
+          </div>
           {players.map(p => (
             <div className="lb-row" key={p.id}>
               <span className="lb-rank">{p.rank}</span>
@@ -107,7 +119,7 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
             </div>
           ))}
           {players.length < playerTotal && (
-            <button className="btn ghost lb-more" type="button" disabled={loading} onClick={() => fetchPlayers(playerPage + 1, true)}>
+            <button className="btn ghost lb-more" type="button" disabled={loading} onClick={() => fetchPlayers(playerPage + 1, true, period)}>
               {loading ? 'Loading\u2026' : 'Load more'}
             </button>
           )}

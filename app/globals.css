@@ -261,6 +261,9 @@
   .lb-rating { font: 700 14px/1 var(--font-display); font-variant-numeric: tabular-nums; }
   .lb-more { align-self: center; min-height: 40px; }
   .lb-note { margin: 0; font: 600 13.5px/1.3 var(--font-body); text-align: center; padding: 8px; }
+  .lb-period { justify-content: center; }
+  .lb-period .btn.small { min-height: 32px; padding: 4px 14px; font-size: 12px; border-radius: 10px; }
+  .lb-period .btn.small.active { background: var(--color-ink); color: var(--color-paper); }
 
   /* finding / matchmaking */
   .finding .status { font: 800 16px/1.3 var(--font-body); }
