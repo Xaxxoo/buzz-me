@@ -36,6 +36,10 @@ export class ChallengesService implements OnModuleInit {
 
     const shareCode = randomBytes(6).toString('hex').slice(0, 12).toUpperCase();
 
+    if (dto.guest_university_id && dto.guest_university_id === user.university_id) {
+      throw new BadRequestException('You cannot target your own university');
+    }
+
     const challenge = this.challengeRepo.create({
       host_university_id: user.university_id,
       created_by: userId,
@@ -43,6 +47,7 @@ export class ChallengesService implements OnModuleInit {
       question_count: dto.question_count || 20,
       team_size: dto.team_size || 1,
       start_at: dto.start_at ? new Date(dto.start_at) : null,
+      guest_university_id: dto.guest_university_id || null,
       status: 'open',
       share_code: shareCode,
     });
@@ -50,11 +55,15 @@ export class ChallengesService implements OnModuleInit {
     return this.challengeRepo.save(challenge);
   }
 
-  async findAll(query: { status?: string; page?: number; limit?: number }) {
+  async findAll(query: { status?: string; page?: number; limit?: number; university_id?: string }) {
     const page = query.page || 1;
     const limit = Math.min(query.limit || 20, 50);
     const where: any = {};
     if (query.status) where.status = query.status;
+    if (query.university_id) {
+      // Show challenges targeting this university, or open (no target)
+      where.guest_university_id = query.university_id;
+    }
 
     const [items, total] = await this.challengeRepo.findAndCount({
       where,
@@ -97,6 +106,9 @@ export class ChallengesService implements OnModuleInit {
     }
     if (challenge.host_university_id === user.university_id) {
       throw new BadRequestException('You cannot accept your own university\'s challenge');
+    }
+    if (challenge.guest_university_id && challenge.guest_university_id !== user.university_id) {
+      throw new BadRequestException('This challenge is directed at a different university');
     }
 
     challenge.guest_university_id = user.university_id;

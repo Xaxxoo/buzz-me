@@ -1,4 +1,4 @@
-import { IsOptional, IsArray, IsInt, Min, Max, IsDateString, IsString } from 'class-validator';
+import { IsOptional, IsArray, IsInt, Min, Max, IsDateString, IsString, IsUUID } from 'class-validator';
 
 export class CreateChallengeDto {
   @IsOptional()
@@ -21,4 +21,9 @@ export class CreateChallengeDto {
   @IsOptional()
   @IsDateString()
   start_at?: string | null;
+
+  /** Target a specific university directly. Null means open challenge. */
+  @IsOptional()
+  @IsUUID()
+  guest_university_id?: string | null;
 }
