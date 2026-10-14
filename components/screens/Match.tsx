@@ -81,9 +81,10 @@ interface Props {
   onCancelFind?: () => void;
   onJoinPrivate?: (code: string) => void;
   onCancelPrivate?: () => void;
+  onTutorialNext?: () => void;
 }
 
-export function Match({ active, s, boardKey, onBuzz, onAnswer, onAcceptBot, onDismissBot, onCancelFind, onJoinPrivate, onCancelPrivate }: Props) {
+export function Match({ active, s, boardKey, onBuzz, onAnswer, onAcceptBot, onDismissBot, onCancelFind, onJoinPrivate, onCancelPrivate, onTutorialNext }: Props) {
   const qtext = useRef<HTMLParagraphElement>(null);
   const solo = s.mode === 'daily';
   const cardKey = `${s.qi}-${s.bonusCard ? 'b' : 't'}`;
@@ -123,6 +124,15 @@ export function Match({ active, s, boardKey, onBuzz, onAnswer, onAcceptBot, onDi
         {s.answer && <p className="answer" id="answer">Answer: {s.answer}</p>}
         {s.stamp && <div key={s.stamp.key} className="stamp" id="stamp" style={{ '--c': teamColor(s.stamp.team) } as CSSProperties}>{s.stamp.text}</div>}
       </article>
+
+      {s.tutorialTip && (
+        <div className="tutorial-tip" style={{ pointerEvents: (s.tutorialStep === 2 || s.tutorialStep === 3) ? 'none' : 'auto' }}>
+          <p>{s.tutorialTip}</p>
+          {s.tutorialStep !== 2 && s.tutorialStep !== 3 && (
+            <button className="btn small" type="button" style={{ pointerEvents: 'auto' }} onClick={onTutorialNext}>Got it</button>
+          )}
+        </div>
+      )}
 
       {s.spectating && <div className="flex justify-center"><span className="spectating-badge">Spectating</span></div>}
       <p className="status" id="status" role="status" aria-live="polite">{s.status}</p>
