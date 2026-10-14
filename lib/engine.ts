@@ -85,6 +85,7 @@ export interface GameState {
   matchId: string | null;
   finding: boolean;
   findElapsed: number;
+  botOffer: boolean;
   opponentName: string | null;
   /* teams */
   teamView: 'list' | 'create' | 'lobby';
@@ -127,7 +128,7 @@ const initial = (): GameState => ({
   result: null, resultKey: 0,
   save: defaultSave(),
   selectedCategories: [], difficulty: 'medium',
-  matchMode: 'local', matchId: null, finding: false, findElapsed: 0, opponentName: null,
+  matchMode: 'local', matchId: null, finding: false, findElapsed: 0, botOffer: false, opponentName: null,
   teamView: 'list', myTeams: [], activeTeam: null, lobby: null, teamFinding: false,
   notifications: [], unreadCount: 0,
   challengeView: 'board', challenges: [], activeChallenge: null, challengeLobby: null,
@@ -299,7 +300,7 @@ export class GameEngine {
   findQuickMatch() {
     this.cut();
     this.phase = 'idle';
-    this.set({ screen: 's-match', finding: true, findElapsed: 0, matchMode: 'online', matchId: null, opponentName: null, status: 'Finding opponent\u2026', zone: 'none', buzzLive: false, tag: '', words: [], answer: null, bonusCard: false });
+    this.set({ screen: 's-match', finding: true, findElapsed: 0, botOffer: false, matchMode: 'online', matchId: null, opponentName: null, status: 'Finding opponent\u2026', zone: 'none', buzzLive: false, tag: '', words: [], answer: null, bonusCard: false });
     this.findTimer = setInterval(() => { this.set({ findElapsed: this.state.findElapsed + 1 }); }, 1000);
   }
   cancelFind() {
@@ -857,15 +858,32 @@ export class GameEngine {
   onlineOpponentForfeited() {
     this.status('Opponent forfeited.');
   }
+  onlineReconnectState(data: { match_id: string; round: number; total: number; score_a: number; score_b: number; phase: string }) {
+    const myScore = this.mySide === 'a' ? data.score_a : data.score_b;
+    const theirScore = this.mySide === 'a' ? data.score_b : data.score_a;
+    this.set({
+      matchId: data.match_id, qi: data.round - 1, total: data.total,
+      scoreYou: myScore, scoreRival: theirScore,
+      screen: 's-match', matchMode: 'online', finding: false,
+    });
+    this.status('Reconnected. Waiting for next question\u2026');
+  }
 
   onlineMatchmakingStatus(data: { position: number; elapsed_ms: number }) {
     this.set({ findElapsed: Math.round(data.elapsed_ms / 1000) });
     this.status(`Finding opponent\u2026 ${Math.round(data.elapsed_ms / 1000)}s`);
   }
   onlineMatchmakingTimeout(_data: { offer_bot: boolean }) {
-    this.status('No opponents found. Try again or play locally.');
+    this.status('No opponents found yet.');
+    this.set({ botOffer: true });
+  }
+  acceptBotMatch() {
     if (this.findTimer) { clearInterval(this.findTimer); this.findTimer = null; }
-    this.set({ finding: false });
+    this.set({ finding: false, botOffer: false });
+  }
+  dismissBotOffer() {
+    this.set({ botOffer: false });
+    this.status('Still searching\u2026');
   }
 
   /** Answer an online question by option index (sent to server). */

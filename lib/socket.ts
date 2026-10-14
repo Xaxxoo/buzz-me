@@ -44,6 +44,10 @@ export class SocketClient {
   cancelFind() {
     this.socket?.emit('match:cancel_find');
   }
+  acceptBotMatch(categories?: string[]) {
+    this.socket?.emit('match:cancel_find');
+    this.socket?.emit('match:solo', { categories });
+  }
   startSolo(categories?: string[]) {
     this.socket?.emit('match:solo', { categories });
   }
@@ -119,6 +123,7 @@ export class SocketClient {
     s.on('match:opponent_disconnected', () => this.engine.onlineOpponentDisconnected());
     s.on('match:opponent_reconnected', () => this.engine.onlineOpponentReconnected());
     s.on('match:opponent_forfeited', () => this.engine.onlineOpponentForfeited());
+    s.on('match:reconnect_state', d => this.engine.onlineReconnectState(d));
     s.on('matchmaking:status', d => this.engine.onlineMatchmakingStatus(d));
     s.on('matchmaking:timeout', d => this.engine.onlineMatchmakingTimeout(d));
 

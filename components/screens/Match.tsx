@@ -53,9 +53,12 @@ interface Props {
   boardKey: string;
   onBuzz: () => void;
   onAnswer: (text: string) => void;
+  onAcceptBot?: () => void;
+  onDismissBot?: () => void;
+  onCancelFind?: () => void;
 }
 
-export function Match({ active, s, boardKey, onBuzz, onAnswer }: Props) {
+export function Match({ active, s, boardKey, onBuzz, onAnswer, onAcceptBot, onDismissBot, onCancelFind }: Props) {
   const qtext = useRef<HTMLParagraphElement>(null);
   const solo = s.mode === 'daily';
   const cardKey = `${s.qi}-${s.bonusCard ? 'b' : 't'}`;
@@ -98,6 +101,16 @@ export function Match({ active, s, boardKey, onBuzz, onAnswer }: Props) {
 
       {s.spectating && <div className="flex justify-center"><span className="spectating-badge">Spectating</span></div>}
       <p className="status" id="status" role="status" aria-live="polite">{s.status}</p>
+
+      {s.finding && s.botOffer && (
+        <div className="bot-offer flex flex-col items-center gap-3">
+          <div className="flex gap-2">
+            <button className="btn" type="button" onClick={onAcceptBot}>Play Bot</button>
+            <button className="btn ghost" type="button" onClick={onDismissBot}>Keep Waiting</button>
+          </div>
+          <button className="btn ghost small" type="button" onClick={onCancelFind}>Cancel</button>
+        </div>
+      )}
 
       <div className="zone shrink-0 min-h-[226px] flex flex-col justify-center">
         {!s.spectating && (
