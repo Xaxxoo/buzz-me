@@ -12,6 +12,12 @@ export interface ClientToServerEvents {
   'team:start_find': (data: { team_id: string; categories?: string[] }) => void;
   'team:cancel_find': (data: { team_id: string }) => void;
   'team:challenge': (data: { team_id: string; opponent_code: string }) => void;
+  'challenge:join_lobby': (data: { challenge_id: string }) => void;
+  'challenge:leave_lobby': (data: { challenge_id: string }) => void;
+  'challenge:ready': (data: { challenge_id: string; ready: boolean }) => void;
+  'challenge:start': (data: { challenge_id: string }) => void;
+  'spectate:join': (data: { match_id: string }) => void;
+  'spectate:leave': (data: { match_id: string }) => void;
 }
 
 /** Server→Client events */
@@ -41,10 +47,15 @@ export interface ServerToClientEvents {
   'matchmaking:status': (data: { position: number; elapsed_ms: number }) => void;
   'matchmaking:timeout': (data: { offer_bot: boolean }) => void;
   'error': (data: { message: string }) => void;
+  'notification:new': (data: { id: string; type: string; title: string; body: string; data: Record<string, any>; created_at: Date }) => void;
   'team:lobby_update': (data: TeamLobbyUpdate) => void;
   'team:finding': () => void;
   'team:match_found': (data: { match_id: string; opponent_team: string }) => void;
   'team:match_timeout': () => void;
+  'challenge:lobby_update': (data: any) => void;
+  'challenge:starting': (data: { challenge_id: string; countdown: number }) => void;
+  'challenge:live': (data: { challenge_id: string; match_id: string }) => void;
+  'spectate:state': (data: { match_id: string; score_a: number; score_b: number; round: number; total: number; phase: string }) => void;
 }
 
 export interface TeamLobbyMemberInfo {

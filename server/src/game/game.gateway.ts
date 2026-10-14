@@ -9,6 +9,7 @@ import { GameService } from './game.service';
 import { MatchmakingService } from './matchmaking.service';
 import { TeamLobbyService } from './team-lobby.service';
 import { TeamMatchmakingService } from './team-matchmaking.service';
+import { ChallengeLobbyService } from './challenge-lobby.service';
 import { TeamsService } from '../teams/teams.service';
 import { WsExceptionFilter } from '../common/filters/ws-exception.filter';
 
@@ -19,6 +20,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private readonly logger = new Logger(GameGateway.name);
+  private userSockets = new Map<string, Socket>();
 
   constructor(
     private jwtService: JwtService,
@@ -26,8 +28,15 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private matchmakingService: MatchmakingService,
     private teamLobbyService: TeamLobbyService,
     private teamMatchmakingService: TeamMatchmakingService,
+    private challengeLobbyService: ChallengeLobbyService,
     private teamsService: TeamsService,
   ) {}
+
+  /** Emit an event to a user's socket if they are currently connected. */
+  emitToUser(userId: string, event: string, data: any) {
+    const socket = this.userSockets.get(userId);
+    if (socket?.connected) socket.emit(event, data);
+  }
 
   async handleConnection(client: Socket) {
     try {
@@ -40,6 +49,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const payload = await this.jwtService.verifyAsync(token);
       (client as any).user = { id: payload.sub, username: payload.username };
+      this.userSockets.set(payload.sub, client);
       this.logger.log(`Client connected: ${payload.username} (${client.id})`);
 
       // RTT measurement
@@ -58,11 +68,18 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const user = (client as any).user;
     if (!user) return;
 
+    // Only remove from map if this socket is still the registered one (prevents race with reconnect)
+    if (this.userSockets.get(user.id) === client) {
+      this.userSockets.delete(user.id);
+    }
     this.logger.log(`Client disconnected: ${user.username} (${client.id})`);
     this.matchmakingService.removeFromQueue(user.id);
     // Clean up team lobby if disconnected
     const lobby = this.teamLobbyService.getLobbyByUser(user.id);
     if (lobby) this.teamLobbyService.leaveLobby(lobby.teamId, user.id, this.server);
+    // Clean up challenge lobby if disconnected
+    const cLobby = this.challengeLobbyService.getLobbyByUser(user.id);
+    if (cLobby) this.challengeLobbyService.leaveLobby(cLobby.challengeId, user.id, this.server);
     this.gameService.handleDisconnect(user.id);
   }
 
@@ -270,5 +287,132 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     this.teamMatchmakingService.challengeByCode(lobby, data.opponent_code);
+  }
+
+  // ---------- Challenge handlers ----------
+
+  @SubscribeMessage('challenge:join_lobby')
+  async handleChallengeJoinLobby(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { challenge_id: string },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    const dbUser = await this.gameService.getDbUser(user.id);
+    if (!dbUser) return;
+
+    let lobby = this.challengeLobbyService.getLobby(data.challenge_id);
+    if (!lobby) {
+      // Need to fetch challenge data — import inline to avoid circular deps
+      // The gateway doesn't inject ChallengesService to keep deps minimal.
+      // Instead, we only allow joining if the lobby has been created by accept flow.
+      client.emit('error', { message: 'Challenge lobby not found. Accept the challenge first.' });
+      return;
+    }
+
+    this.challengeLobbyService.joinLobby(
+      data.challenge_id,
+      { id: user.id, username: user.username, rating: dbUser.rating, universityId: dbUser.university_id },
+      client,
+      this.server,
+    );
+  }
+
+  @SubscribeMessage('challenge:leave_lobby')
+  handleChallengeLeave(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { challenge_id: string },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+    this.challengeLobbyService.leaveLobby(data.challenge_id, user.id, this.server);
+  }
+
+  @SubscribeMessage('challenge:ready')
+  handleChallengeReady(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { challenge_id: string; ready: boolean },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+    this.challengeLobbyService.setReady(data.challenge_id, user.id, data.ready, this.server);
+  }
+
+  @SubscribeMessage('challenge:start')
+  async handleChallengeStart(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { challenge_id: string },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    const lobby = this.challengeLobbyService.getLobby(data.challenge_id);
+    if (!lobby) {
+      client.emit('error', { message: 'Challenge lobby not found' });
+      return;
+    }
+    if (!this.challengeLobbyService.allReady(data.challenge_id)) {
+      client.emit('error', { message: 'All players must be ready' });
+      return;
+    }
+
+    // Notify lobby that the challenge is starting
+    this.server.to(`challenge_lobby_${data.challenge_id}`).emit('challenge:starting', {
+      challenge_id: data.challenge_id,
+      countdown: 3,
+    });
+
+    // Create the game room
+    const room = await this.gameService.createChallengeRoom(
+      data.challenge_id,
+      lobby.hostPlayers.map(p => ({
+        userId: p.userId,
+        username: p.username,
+        rating: p.rating,
+        universityId: p.universityId,
+        socket: p.socket,
+      })),
+      lobby.guestPlayers.map(p => ({
+        userId: p.userId,
+        username: p.username,
+        rating: p.rating,
+        universityId: p.universityId,
+        socket: p.socket,
+      })),
+      lobby.hostUniId,
+      lobby.guestUniId,
+      lobby.hostUniName,
+      lobby.guestUniName,
+      20, // default question count
+    );
+
+    this.server.to(`challenge_lobby_${data.challenge_id}`).emit('challenge:live', {
+      challenge_id: data.challenge_id,
+      match_id: room.id,
+    });
+
+    this.challengeLobbyService.removeLobby(data.challenge_id);
+  }
+
+  // ---------- Spectate handlers ----------
+
+  @SubscribeMessage('spectate:join')
+  handleSpectateJoin(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { match_id: string },
+  ) {
+    const success = this.gameService.addSpectator(data.match_id, client);
+    if (!success) {
+      client.emit('error', { message: 'Match not found' });
+    }
+  }
+
+  @SubscribeMessage('spectate:leave')
+  handleSpectateLeave(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { match_id: string },
+  ) {
+    this.gameService.removeSpectator(data.match_id, client);
   }
 }
