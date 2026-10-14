@@ -128,7 +128,7 @@
   .school { gap: 12px; min-height: 56px; padding: 6px 12px; }
   .school .crest { width: 34px; flex: none; }
   .school .nm { min-width: 0; flex: 1; font: 600 15px/1.2 var(--font-body); }
-  .school .nm span { display: block; }
+  .school .nm span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .school .nm small { display: block; margin-top: 2px; font: 600 12px/1.2 var(--font-body); opacity: .7; }
   .school[aria-pressed="true"] { background: var(--color-ink); color: var(--color-paper); }
   .school.add { border-style: dashed; box-shadow: none; }
@@ -140,12 +140,13 @@
   .cat { display: grid; grid-template-columns: minmax(0, 7.5em) 1fr auto; align-items: center; gap: 10px; font: 600 14px/1.2 var(--font-body); }
   .cat .bar { height: 14px; border: 2px solid var(--color-ink); border-radius: 99px; background: var(--color-paper); overflow: hidden; }
   .cat .bar i { display: block; height: 100%; background: var(--color-leaf); }
+  .cat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cat b { font: 700 12px/1 var(--font-display); font-variant-numeric: tabular-nums; }
 
   /* versus */
   .vs-side .crest { width: 120px; }
-  .vs-side b { font: 900 22px/1.1 var(--font-display); letter-spacing: -.03em; }
-  .vs-side span { max-width: 30ch; text-wrap: balance; font: 600 14px/1.2 var(--font-body); }
+  .vs-side b { font: 900 22px/1.1 var(--font-display); letter-spacing: -.03em; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vs-side span { max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 14px/1.2 var(--font-body); }
   .vs-side.left { animation: fromL .6s cubic-bezier(.2,1.4,.4,1) both; }
   .vs-side.right { animation: fromR .6s .15s cubic-bezier(.2,1.4,.4,1) both; }
   .vs-mark { font: 900 44px/1 var(--font-display); color: var(--color-buzz); -webkit-text-stroke: 4px var(--color-ink); paint-order: stroke fill; text-shadow: 0 5px 0 var(--color-ink); animation: pop .4s .55s cubic-bezier(.2,1.8,.4,1) both; margin-block: 6px; }
@@ -158,7 +159,7 @@
   .team.rival { --c: var(--color-rival); flex-direction: row-reverse; text-align: right; }
   .team .crest { width: 36px; flex: none; }
   .team .meta { min-width: 0; flex: 1; }
-  .team .who { font: 700 10.5px/1 var(--font-display); }
+  .team .who { font: 700 10.5px/1 var(--font-display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .team .pts { font: 900 28px/1 var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -.03em; margin-top: 3px; }
   .team .pts.hit { animation: hit .4s cubic-bezier(.2,1.8,.4,1); }
   .team.rival .seats { justify-content: flex-end; }
@@ -217,7 +218,7 @@
   .share h2 { margin: 0; font: 900 clamp(22px,7vw,30px)/1.08 var(--font-display); letter-spacing: -.03em; text-wrap: balance; }
   .f .crest { width: 68px; }
   .f b { font: 900 44px/1 var(--font-display); font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
-  .f span { font: 700 11px/1.1 var(--font-display); }
+  .f span { font: 700 11px/1.1 var(--font-display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
   .dash { font: 900 28px/1 var(--font-display); }
   .stats { margin: 0; display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
   .stats div { padding: 8px 4px; border: 2px solid var(--color-ink); border-radius: 12px; min-width: 0; }
@@ -284,7 +285,7 @@
   /* team card */
   .team-card { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 12px 14px; background: var(--color-paper); border: 3px solid var(--color-ink); border-radius: 16px; box-shadow: 0 4px 0 var(--color-ink); text-align: left; cursor: pointer; transition: transform .08s, box-shadow .08s; }
   .team-card:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--color-ink); }
-  .team-card b { display: block; font: 900 14px/1.1 var(--font-display); letter-spacing: -.02em; }
+  .team-card b { display: block; font: 900 14px/1.1 var(--font-display); letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .team-card span { display: block; font: 600 12.5px/1.25 var(--font-body); }
 
   /* invite code */
@@ -310,18 +311,18 @@
   .notif-list { padding: 4px 0; }
   .notif-item { padding: 8px 12px; border-bottom: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent); }
   .notif-item.unread { background: color-mix(in srgb, var(--color-sun) 12%, transparent); }
-  .notif-item b { display: block; font: 700 12px/1.2 var(--font-display); margin-bottom: 2px; }
-  .notif-item span { font: 600 12.5px/1.3 var(--font-body); }
+  .notif-item b { display: block; font: 700 12px/1.2 var(--font-display); margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .notif-item span { font: 600 12.5px/1.3 var(--font-body); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
   /* challenge styles */
   .challenge-card { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--color-paper); border: 3px solid var(--color-ink); border-radius: 16px; box-shadow: 0 4px 0 var(--color-ink); cursor: pointer; text-align: left; transition: transform .08s, box-shadow .08s; }
   .challenge-card:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--color-ink); }
-  .challenge-card b { font: 900 14px/1.1 var(--font-display); letter-spacing: -.02em; }
+  .challenge-card b { font: 900 14px/1.1 var(--font-display); letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .challenge-card span { font: 600 12.5px/1.25 var(--font-body); }
   .challenge-card .challenge-meta { display: flex; gap: 8px; flex-wrap: wrap; }
   .challenge-card .challenge-meta em { padding: 3px 8px; border-radius: 99px; background: var(--color-fog); color: var(--color-ink); font: 700 10px/1 var(--font-display); font-style: normal; }
   .challenge-detail { display: flex; flex-direction: column; gap: 12px; padding: 18px 16px; background: var(--color-paper); border: 3px solid var(--color-ink); border-radius: 22px; box-shadow: 0 6px 0 var(--color-ink); }
-  .challenge-detail h3 { margin: 0; font: 900 18px/1.1 var(--font-display); letter-spacing: -.03em; }
+  .challenge-detail h3 { margin: 0; font: 900 18px/1.1 var(--font-display); letter-spacing: -.03em; overflow-wrap: break-word; word-break: break-word; }
   .challenge-lobby-side { flex: 1; min-width: 0; padding: 12px; background: var(--color-paper); border: 3px solid var(--color-ink); border-radius: 16px; }
   .challenge-lobby-side h4 { margin: 0 0 8px; font: 900 13px/1.1 var(--font-display); }
 
@@ -334,6 +335,10 @@
   .private-code { font: 900 28px/1 var(--font-display); letter-spacing: .15em; padding: 8px 16px; background: var(--color-sun); color: var(--color-ink); border: 3px solid var(--color-ink); border-radius: 12px; }
   .code-input { width: 120px; padding: 8px 12px; border: 3px solid var(--color-ink); border-radius: 12px; font: 700 16px/1 var(--font-display); text-align: center; letter-spacing: .15em; text-transform: uppercase; background: var(--color-paper); }
   .code-input::placeholder { font: 600 12px/1 var(--font-body); letter-spacing: normal; text-transform: none; }
+  /* device management */
+  .device-section { margin-top: 8px; padding-top: 12px; border-top: 2px solid color-mix(in srgb, var(--color-ink) 12%, transparent); }
+  .device-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--color-paper); border: 2px solid var(--color-ink); border-radius: 10px; }
+
   /* challenge toast */
   .challenge-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 20px; background: var(--color-paper); border: 3px solid var(--color-ink); border-radius: 18px; box-shadow: 0 6px 0 var(--color-ink); animation: var(--animate-enter); }
   .challenge-toast p { margin: 0; font: 700 14px/1.3 var(--font-display); text-align: center; }
@@ -342,9 +347,19 @@
   .lb-category .btn.small { min-height: 28px; padding: 3px 10px; font-size: 11px; border-radius: 8px; }
   .lb-category .btn.small.active { background: var(--color-ink); color: var(--color-paper); }
 
+  /* tutorial tip */
+  .tutorial-tip { position: relative; z-index: 10; padding: 14px 16px; background: var(--color-sun); border: 3px solid var(--color-ink); border-radius: 16px 16px 0 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .tutorial-tip p { margin: 0; font: 800 14px/1.3 var(--font-body); }
+  .tutorial-tip .btn.small { min-height: 36px; padding: 6px 18px; font-size: 13px; }
+
+  /* connectivity banners */
+  .offline-banner, .reconnecting-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 50; text-align: center; padding: 8px 16px; font: 700 13px/1.3 var(--font-body); }
+  .offline-banner { background: var(--color-buzz); color: #fff; }
+  .reconnecting-banner { background: var(--color-sun); color: var(--color-ink); }
+
   /* university profile */
   .uni-profile-header { padding: 16px; background: var(--color-paper); border: 3px solid var(--color-ink); border-radius: 16px; }
-  .uni-profile-header h3 { margin: 0 0 12px; font: 900 18px/1.1 var(--font-display); letter-spacing: -.03em; }
+  .uni-profile-header h3 { margin: 0 0 12px; font: 900 18px/1.1 var(--font-display); letter-spacing: -.03em; overflow-wrap: break-word; word-break: break-word; }
   .uni-profile-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
   .uni-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
   .uni-stat b { font: 900 20px/1 var(--font-display); }
@@ -401,4 +416,7 @@
 @media (prefers-reduced-motion: reduce) {
   .rays, .dome.live::after, .z-rival .crest { animation: none; }
   .w, .screen.enter, .logo, .vs-side.left, .vs-side.right, .vs-mark, .vs-note, .stage.jolt, .opt, .share, .stamp, .answer { animation: none; }
+  .chip, .dots i, .flash.go, .seats i.on, .pts.hit, .spectating-badge::before, .challenge-toast { animation: none; }
+  .meter i { animation-duration: 0.01s !important; }
+  *, *::before, *::after { transition-duration: 0.01s !important; }
 }
