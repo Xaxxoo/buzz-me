@@ -87,4 +87,44 @@ export class TeamsService {
 
     return { removed: true };
   }
+
+  async regenerateInviteCode(teamId: string, requesterId: string) {
+    const team = await this.teamRepo.findOneBy({ id: teamId });
+    if (!team) throw new NotFoundException('Team not found');
+    if (team.captain_id !== requesterId) {
+      throw new ForbiddenException('Only captain can regenerate invite code');
+    }
+
+    team.invite_code = randomBytes(6).toString('hex').slice(0, 12).toUpperCase();
+    await this.teamRepo.save(team);
+    return { invite_code: team.invite_code };
+  }
+
+  async transferCaptaincy(teamId: string, newCaptainId: string, requesterId: string) {
+    const team = await this.teamRepo.findOne({
+      where: { id: teamId },
+      relations: ['members'],
+    });
+    if (!team) throw new NotFoundException('Team not found');
+    if (team.captain_id !== requesterId) {
+      throw new ForbiddenException('Only captain can transfer captaincy');
+    }
+
+    const isMember = team.members.some(m => m.user_id === newCaptainId);
+    if (!isMember) throw new BadRequestException('Target user is not a team member');
+
+    // Update roles
+    await this.memberRepo.update(
+      { team_id: teamId, user_id: requesterId },
+      { role: 'member' },
+    );
+    await this.memberRepo.update(
+      { team_id: teamId, user_id: newCaptainId },
+      { role: 'captain' },
+    );
+    team.captain_id = newCaptainId;
+    await this.teamRepo.save(team);
+
+    return this.findOne(teamId);
+  }
 }

@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Get, Delete, Body, Param, UseGuards,
+  Controller, Post, Get, Delete, Patch, Body, Param, UseGuards,
 } from '@nestjs/common';
 import { TeamsService } from './teams.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -44,5 +44,22 @@ export class TeamsController {
     @Param('memberId') memberId: string,
   ) {
     return this.service.removeMember(teamId, memberId, userId);
+  }
+
+  @Patch(':id/invite-code')
+  regenerateInviteCode(
+    @CurrentUser('id') userId: string,
+    @Param('id') teamId: string,
+  ) {
+    return this.service.regenerateInviteCode(teamId, userId);
+  }
+
+  @Patch(':id/captain')
+  transferCaptaincy(
+    @CurrentUser('id') userId: string,
+    @Param('id') teamId: string,
+    @Body('new_captain_id') newCaptainId: string,
+  ) {
+    return this.service.transferCaptaincy(teamId, newCaptainId, userId);
   }
 }
