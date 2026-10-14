@@ -5,7 +5,7 @@ export class University {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true, length: 80 })
   name: string;
 
   @Column({ length: 10 })

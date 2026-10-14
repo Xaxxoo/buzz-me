@@ -19,10 +19,10 @@ export class Notification {
   @Column({ length: 40 })
   type: string; // challenge_accepted, challenge_starting, team_joined, rank_change
 
-  @Column()
+  @Column({ length: 120 })
   title: string;
 
-  @Column()
+  @Column({ length: 500 })
   body: string;
 
   @Column({ type: 'jsonb', default: {} })
