@@ -114,6 +114,7 @@ export class SocketClient {
     s.on('match:bonus', d => this.engine.onlineBonus(d));
     s.on('match:bonus_result', d => this.engine.onlineBonusResult(d));
     s.on('match:round_end', d => this.engine.onlineRoundEnd(d));
+    s.on('match:sudden_death', () => this.engine.onlineSuddenDeath());
     s.on('match:end', d => this.engine.onlineMatchEnd(d));
     s.on('match:opponent_disconnected', () => this.engine.onlineOpponentDisconnected());
     s.on('match:opponent_reconnected', () => this.engine.onlineOpponentReconnected());
@@ -137,6 +138,14 @@ export class SocketClient {
 
     // Spectate events
     s.on('spectate:state', d => this.engine.onSpectateState(d));
+
+    s.on('connect', () => {
+      // On reconnect, rejoin match if one was in progress
+      const snap = this.engine.getSnapshot();
+      if (snap.screen === 's-match' && snap.matchMode === 'online' && snap.matchId) {
+        s.emit('match:reconnect', { match_id: snap.matchId });
+      }
+    });
 
     s.on('connect_error', async () => {
       // Try refreshing the token

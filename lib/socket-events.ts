@@ -53,6 +53,7 @@ export interface ServerToClientEvents {
   'match:bonus': (data: { text: string; options: string[]; seconds: number; for_side: string }) => void;
   'match:bonus_result': (data: { correct: boolean; correct_answer: string; points: number; score_a: number; score_b: number }) => void;
   'match:round_end': (data: { round: number; score_a: number; score_b: number; took: string }) => void;
+  'match:sudden_death': (data: Record<string, never>) => void;
   'match:end': (data: MatchEndData) => void;
   'match:opponent_disconnected': () => void;
   'match:opponent_reconnected': () => void;

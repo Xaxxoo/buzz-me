@@ -8,7 +8,7 @@ import {
 } from './save';
 import { pickRival, school } from './schools';
 import { setMuted, sfx } from './sfx';
-import type { QA, Question, School, Team, TeamData, LobbyState, NotificationData, ChallengeData, ChallengeLobbyState } from './types';
+import type { QA, Question, School, Team, TeamData, LobbyState, NotificationData, ChallengeData, ChallengeLobbyState, UniversityProfileData } from './types';
 
 /*
  * The game engine. It owns every timer and all match state, and publishes an immutable
@@ -19,7 +19,7 @@ import type { QA, Question, School, Team, TeamData, LobbyState, NotificationData
  * from a room server and keep the rest.
  */
 
-export type Screen = 's-title' | 's-pick' | 's-vs' | 's-match' | 's-result' | 's-stats' | 's-login' | 's-signup' | 's-leaderboard' | 's-team' | 's-challenges';
+export type Screen = 's-title' | 's-pick' | 's-vs' | 's-match' | 's-result' | 's-stats' | 's-login' | 's-signup' | 's-leaderboard' | 's-team' | 's-challenges' | 's-uni-profile';
 export type Took = 'you' | 'rival' | 'none';
 
 export interface WordView { text: string; late: boolean; delay?: number }
@@ -103,6 +103,8 @@ export interface GameState {
   /* spectating */
   spectating: boolean;
   spectateMatchId: string | null;
+  /* university profile */
+  universityProfile: UniversityProfileData | null;
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -130,6 +132,7 @@ const initial = (): GameState => ({
   notifications: [], unreadCount: 0,
   challengeView: 'board', challenges: [], activeChallenge: null, challengeLobby: null,
   spectating: false, spectateMatchId: null,
+  universityProfile: null,
 });
 
 export class GameEngine {
@@ -627,6 +630,11 @@ export class GameEngine {
     this.set({ spectating: false, spectateMatchId: null });
     this.menu();
   }
+
+  /* ---------- university profile ---------- */
+  showUniversityProfile(profile: UniversityProfileData) {
+    this.set({ screen: 's-uni-profile', universityProfile: profile });
+  }
   onSpectateState(data: { match_id: string; score_a: number; score_b: number; round: number; total: number }) {
     this.set({ scoreYou: data.score_a, scoreRival: data.score_b, qi: data.round - 1, total: data.total });
   }
@@ -799,6 +807,10 @@ export class GameEngine {
       sfx.wrong();
       this.status('Bonus missed.');
     }
+  }
+
+  onlineSuddenDeath() {
+    this.status('Sudden death! Next point wins.');
   }
 
   onlineRoundEnd(data: { round: number; score_a: number; score_b: number; took: string }) {
