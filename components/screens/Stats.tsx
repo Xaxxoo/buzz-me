@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import { DAILY } from '@/lib/config';
 import { num } from '@/lib/engine';
 import { liveStreak, type Save } from '@/lib/save';
@@ -11,7 +14,24 @@ export function StatCells({ cells, id }: { cells: [string, string][]; id: string
   );
 }
 
-export function Stats({ active, save, you, onMenu }: { active: boolean; save: Save; you: School | null; onMenu: () => void }) {
+interface DeviceInfo {
+  id: string;
+  device_name: string;
+  last_seen: string;
+  created_at: string;
+}
+
+interface StatsProps {
+  active: boolean;
+  save: Save;
+  you: School | null;
+  onMenu: () => void;
+  devices?: DeviceInfo[];
+  onFetchDevices?: () => void;
+  onRevokeDevice?: (id: string) => void;
+}
+
+export function Stats({ active, save, you, onMenu, devices, onFetchDevices, onRevokeDevice }: StatsProps) {
   const streak = liveStreak(save);
   const rows = Object.entries(save.cats).filter(([, v]) => Array.isArray(v) && v[1] > 0).sort((a, b) => b[1][1] - a[1][1]);
   return (
@@ -37,6 +57,40 @@ export function Stats({ active, save, you, onMenu }: { active: boolean; save: Sa
           </div>
         ))}
       </div>
+      {onFetchDevices && <DeviceList devices={devices} onFetch={onFetchDevices} onRevoke={onRevokeDevice} />}
     </section>
+  );
+}
+
+function DeviceList({ devices, onFetch, onRevoke }: { devices?: DeviceInfo[]; onFetch: () => void; onRevoke?: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+
+  const toggle = () => {
+    if (!open) onFetch();
+    setOpen(!open);
+  };
+
+  return (
+    <div className="device-section shrink-0">
+      <button className="btn ghost small" type="button" onClick={toggle} style={{ width: '100%' }}>
+        {open ? 'Hide devices' : 'Manage devices'}
+      </button>
+      {open && devices && (
+        <div className="flex flex-col gap-2 mt-2">
+          {devices.length === 0 && <p style={{ font: '600 13px/1.3 var(--font-body)', opacity: 0.6 }}>No active sessions.</p>}
+          {devices.map(d => (
+            <div key={d.id} className="device-row">
+              <div className="flex-1 min-w-0">
+                <b className="truncate block" style={{ font: '700 13px/1.2 var(--font-display)' }}>{d.device_name}</b>
+                <span style={{ font: '600 11px/1 var(--font-body)', opacity: 0.6 }}>Last seen: {new Date(d.last_seen).toLocaleDateString()}</span>
+              </div>
+              {onRevoke && (
+                <button className="btn ghost small" type="button" style={{ fontSize: '10px', padding: '3px 8px', minHeight: 0 }} onClick={() => onRevoke(d.id)}>Sign out</button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

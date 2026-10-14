@@ -10,6 +10,7 @@ export interface Api {
   get<T = any>(path: string): Promise<T>;
   post<T = any>(path: string, body?: unknown): Promise<T>;
   put<T = any>(path: string, body?: unknown): Promise<T>;
+  patch<T = any>(path: string, body?: unknown): Promise<T>;
   del<T = any>(path: string): Promise<T>;
 }
 
@@ -45,6 +46,7 @@ export function createApi(getToken: () => string | null, onUnauthorized: () => P
     get: <T,>(path: string) => request<T>('GET', path),
     post: <T,>(path: string, body?: unknown) => request<T>('POST', path, body),
     put: <T,>(path: string, body?: unknown) => request<T>('PUT', path, body),
+    patch: <T,>(path: string, body?: unknown) => request<T>('PATCH', path, body),
     del: <T,>(path: string) => request<T>('DELETE', path),
   };
 }
