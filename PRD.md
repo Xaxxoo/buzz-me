@@ -88,7 +88,7 @@ Requirements are grouped by feature area; P0 = must ship in v1, P1 = soon after,
 
 | ID | Requirement | Priority |
 |---|---|---|
-| A1 | Sign up with email, phone number, or Google; a guest can play solo before signing up and keep progress when converting | P0 |
+| A1 | Sign up with email; a guest can play solo before signing up and keep progress when converting | P0 |
 | A2 | Every user picks a unique username (3–20 chars, letters, digits, underscore; case-insensitive uniqueness; profanity filter) | P0 |
 | A3 | Username can be changed once every 30 days; old name reserved for 30 days | P1 |
 | A4 | A player may optionally link to one university; linking is a choice and can be skipped | P0 |
@@ -352,7 +352,7 @@ The game must feel designed, not generic: one named visual direction, motion tha
 
 | Entity | Key fields | Relationships |
 |---|---|---|
-| User | id, username (unique), email/phone, rating, xp, created_at | Optionally belongs to one University; has many Devices |
+| User | id, username (unique), email, rating, xp, created_at | Optionally belongs to one University; has many Devices |
 | Device session | id, user_id, refresh_token_hash, last_seen | Belongs to User |
 | University | id, name, short_name, email_domains, points, logo | Has many Users, Teams, Challenges |
 | Team | id, name, captain_id, university_id, invite_code | Has many Users (members) |
