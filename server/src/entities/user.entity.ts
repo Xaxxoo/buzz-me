@@ -50,6 +50,9 @@ export class User {
   @Column({ default: false })
   university_verified: boolean;
 
+  @Column({ default: false })
+  is_admin: boolean;
+
   /** { [category_slug]: [right, total] } — mirrors frontend Save.cats */
   @Column({ type: 'jsonb', default: {} })
   category_stats: Record<string, [number, number]>;

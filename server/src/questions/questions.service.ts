@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Question } from '../entities/question.entity';
@@ -64,8 +64,44 @@ export class QuestionsService {
     return a.slice(0, count);
   }
 
+  /** Admin: paginated list with optional filters. */
+  async findAll(opts: { page: number; limit: number; categoryId?: string; difficulty?: string; active?: boolean }) {
+    const { page, limit, categoryId, difficulty, active } = opts;
+    const where: any = {};
+    if (categoryId) where.category_id = categoryId;
+    if (difficulty) where.difficulty = difficulty;
+    if (active !== undefined) where.active = active;
+
+    const [items, total] = await this.repo.findAndCount({
+      where,
+      relations: ['category'],
+      order: { created_at: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    return { items, total, page, limit };
+  }
+
+  async findOne(id: string) {
+    const q = await this.repo.findOne({ where: { id }, relations: ['category'] });
+    if (!q) throw new NotFoundException('Question not found');
+    return q;
+  }
+
   async create(dto: any) {
     const question = this.repo.create(dto);
     return this.repo.save(question);
+  }
+
+  async update(id: string, dto: any) {
+    const question = await this.repo.findOneBy({ id });
+    if (!question) throw new NotFoundException('Question not found');
+    Object.assign(question, dto);
+    return this.repo.save(question);
+  }
+
+  async remove(id: string) {
+    const result = await this.repo.delete(id);
+    if (!result.affected) throw new NotFoundException('Question not found');
   }
 }
