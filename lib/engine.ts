@@ -241,7 +241,7 @@ export class GameEngine {
   private rivalPanel(small: string, big: string | null = null, mark: RivalView['mark'] = '') {
     this.set({ zone: 'rival', ask: null, rivalView: { small, big, mark } });
   }
-  private colors(extra: string[] = []) { const y = this.state.you!; return [y.a, y.b, '#f2ede4', ...extra]; }
+  private colors(extra: string[] = []) { const y = this.state.you!; return [y.a, y.b, '#FFFDF4', ...extra]; }
   private cheer(n: number) { confetti.burstFrom(document.getElementById('opts'), n, this.colors(['#E8322C'])); }
 
   /* ---------- answering ---------- */
@@ -1011,7 +1011,7 @@ export class GameEngine {
         dare: d > 0 ? 'Can your school beat us?' : d < 0 ? 'Rematch and take it back.' : 'One more to settle it.',
       },
     });
-    if (d > 0) { sfx.win(); confetti.rain(this.colors(['#E8322C', '#141210'])); }
+    if (d > 0) { sfx.win(); confetti.rain(this.colors(['#E8322C', '#1B1464'])); }
     else if (d < 0) sfx.lose();
     else sfx.theirs();
   }
@@ -1109,7 +1109,7 @@ export class GameEngine {
         dare: d > 0 ? 'Can your school beat us?' : d < 0 ? 'Rematch and take it back.' : 'One more to settle it.',
       },
     });
-    if (d > 0) { sfx.win(); confetti.rain(this.colors(['#E8322C', '#141210'])); }
+    if (d > 0) { sfx.win(); confetti.rain(this.colors(['#E8322C', '#1B1464'])); }
     else if (d < 0) sfx.lose();
     else sfx.theirs();
   }
