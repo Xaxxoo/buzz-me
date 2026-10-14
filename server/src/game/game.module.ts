@@ -17,10 +17,11 @@ import { Match } from '../entities/match.entity';
 import { MatchParticipant } from '../entities/match-participant.entity';
 import { Round } from '../entities/round.entity';
 import { University } from '../entities/university.entity';
+import { UniversityDailyPoints } from '../entities/university-daily-points.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Match, MatchParticipant, Round, University]),
+    TypeOrmModule.forFeature([User, Match, MatchParticipant, Round, University, UniversityDailyPoints]),
     QuestionsModule,
     TeamsModule,
     JwtModule.registerAsync({
