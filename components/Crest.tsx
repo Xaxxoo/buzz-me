@@ -2,8 +2,8 @@ import { useId } from 'react';
 import type { School } from '@/lib/types';
 
 const SHIELD = 'M8 6H92V56C92 84 70 100 50 110C30 100 8 84 8 56Z';
-const INK = '#1B1464';
-const PAPER = '#FFFDF4';
+const INK = '#f0ebe3';
+const PAPER = '#131211';
 
 /* The second colour is laid over the shield in one of eight heraldic divisions. */
 function Division({ pat, fill }: { pat: School['pat']; fill: string }) {
