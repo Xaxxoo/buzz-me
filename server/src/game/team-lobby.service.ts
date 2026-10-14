@@ -55,7 +55,7 @@ export class TeamLobbyService {
     lobby.members.push(member);
 
     socket.join(`team_lobby_${teamId}`);
-    this.emitUpdate(lobby, socket.server);
+    this.emitUpdate(lobby, (socket as any).server);
     this.logger.log(`${user.username} joined lobby for team ${teamName}`);
 
     return lobby;

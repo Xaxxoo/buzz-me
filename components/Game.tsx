@@ -18,6 +18,7 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { AuthClient } from '@/lib/auth';
 import { API_BASE, GAME_NAME } from '@/lib/config';
 import { GameEngine } from '@/lib/engine';
+import { registerPush } from '@/lib/push';
 import { SocketClient } from '@/lib/socket';
 import type { TeamData, ChallengeData, UniversityProfileData } from '@/lib/types';
 
@@ -42,10 +43,14 @@ export default function Game() {
 
   /* connect socket when authenticated, disconnect on cleanup or logout */
   useEffect(() => {
-    if (authState.status === 'authenticated') socket.connect();
-    else socket.disconnect();
+    if (authState.status === 'authenticated') {
+      socket.connect();
+      registerPush(auth).catch(() => {});
+    } else {
+      socket.disconnect();
+    }
     return () => socket.disconnect();
-  }, [socket, authState.status]);
+  }, [socket, auth, authState.status]);
 
   /* Space buzzes, 1-4 or A-D answers */
   useEffect(() => {
@@ -81,7 +86,10 @@ export default function Game() {
   const flashColor = (s.flash?.team === 'rival' ? s.rival?.a : s.you?.a) ?? '#E8322C';
   const vars = { '--you': s.you?.a ?? '#0B8457', '--rival': s.rival?.a ?? '#1763B8' } as CSSProperties;
 
-  const onBuzz = () => { if (s.matchMode === 'online') socket.buzz(); else engine.buzz(); };
+  const onBuzz = () => {
+    navigator.vibrate?.(50);
+    if (s.matchMode === 'online') socket.buzz(); else engine.buzz();
+  };
   const onAnswer = (text: string) => {
     if (s.matchMode === 'online') {
       const idx = s.ask?.options.findIndex(o => o.text === text) ?? -1;
@@ -96,6 +104,14 @@ export default function Game() {
     const cats = engine.getSnapshot().selectedCategories;
     socket.findMatch(cats.length ? cats : undefined);
   };
+
+  const onAcceptBot = () => {
+    const cats = engine.getSnapshot().selectedCategories;
+    engine.acceptBotMatch();
+    socket.acceptBotMatch(cats.length ? cats : undefined);
+  };
+  const onDismissBot = () => engine.dismissBotOffer();
+  const onCancelFind = () => { socket.cancelFind(); engine.cancelFind(); };
 
   const fetchMyTeams = async () => {
     try {
@@ -239,7 +255,7 @@ export default function Game() {
         />
         <Stats active={s.screen === 's-stats'} save={s.save} you={s.you} onMenu={() => engine.menu()} />
         <Versus active={s.screen === 's-vs'} you={s.you} rival={s.rival} />
-        <Match active={s.screen === 's-match'} s={s} boardKey={String(s.boardKey)} onBuzz={onBuzz} onAnswer={onAnswer} />
+        <Match active={s.screen === 's-match'} s={s} boardKey={String(s.boardKey)} onBuzz={onBuzz} onAnswer={onAnswer} onAcceptBot={onAcceptBot} onDismissBot={onDismissBot} onCancelFind={onCancelFind} />
         <Result
           active={s.screen === 's-result'} result={s.result} resultKey={s.resultKey}
           authStatus={authState.status}
