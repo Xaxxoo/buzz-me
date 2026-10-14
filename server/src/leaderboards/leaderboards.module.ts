@@ -6,9 +6,10 @@ import { User } from '../entities/user.entity';
 import { University } from '../entities/university.entity';
 import { LeaderboardEntry } from '../entities/leaderboard-entry.entity';
 import { MatchParticipant } from '../entities/match-participant.entity';
+import { Round } from '../entities/round.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, University, LeaderboardEntry, MatchParticipant])],
+  imports: [TypeOrmModule.forFeature([User, University, LeaderboardEntry, MatchParticipant, Round])],
   controllers: [LeaderboardsController],
   providers: [LeaderboardsService],
   exports: [LeaderboardsService],

@@ -37,11 +37,13 @@ interface Props {
 }
 
 type Tab = 'players' | 'universities';
-type Period = 'alltime' | 'weekly';
+type Period = 'alltime' | 'weekly' | 'season';
 
 export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
   const [tab, setTab] = useState<Tab>('players');
   const [period, setPeriod] = useState<Period>('alltime');
+  const [category, setCategory] = useState<string>('');
+  const [categories, setCategories] = useState<{ slug: string; name: string }[]>([]);
   const [players, setPlayers] = useState<PlayerRow[]>([]);
   const [universities, setUniversities] = useState<UniversityRow[]>([]);
   const [ownRank, setOwnRank] = useState<OwnRank | null>(null);
@@ -51,10 +53,19 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
   const [uniTotal, setUniTotal] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const fetchPlayers = useCallback(async (page: number, append: boolean, p: Period) => {
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await auth.api.get<{ slug: string; name: string }[]>('/categories');
+      setCategories(res);
+    } catch { /* ignore */ }
+  }, [auth.api]);
+
+  const fetchPlayers = useCallback(async (page: number, append: boolean, p: Period, cat: string) => {
     setLoading(true);
     try {
-      const res = await auth.api.get<{ items: PlayerRow[]; total: number }>(`/leaderboards/players?page=${page}&limit=20&period=${p}`);
+      let url = `/leaderboards/players?page=${page}&limit=20&period=${p}`;
+      if (cat) url += `&category=${encodeURIComponent(cat)}`;
+      const res = await auth.api.get<{ items: PlayerRow[]; total: number }>(url);
       setPlayers(prev => append ? [...prev, ...res.items] : res.items);
       setPlayerTotal(res.total);
       setPlayerPage(page);
@@ -83,13 +94,20 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
 
   useEffect(() => {
     if (!active) return;
-    fetchPlayers(1, false, period);
+    fetchPlayers(1, false, period, category);
     fetchUniversities(1, false);
     fetchOwnRank();
-  }, [active, period, fetchPlayers, fetchUniversities, fetchOwnRank]);
+    fetchCategories();
+  }, [active, period, category, fetchPlayers, fetchUniversities, fetchOwnRank, fetchCategories]);
 
   const switchPeriod = (p: Period) => {
     setPeriod(p);
+    setPlayers([]);
+    setPlayerPage(1);
+  };
+
+  const switchCategory = (slug: string) => {
+    setCategory(slug);
     setPlayers([]);
     setPlayerPage(1);
   };
@@ -110,7 +128,16 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
           <div className="lb-period flex gap-1 shrink-0">
             <button className={'btn ghost small' + (period === 'alltime' ? ' active' : '')} type="button" onClick={() => switchPeriod('alltime')}>All Time</button>
             <button className={'btn ghost small' + (period === 'weekly' ? ' active' : '')} type="button" onClick={() => switchPeriod('weekly')}>This Week</button>
+            <button className={'btn ghost small' + (period === 'season' ? ' active' : '')} type="button" onClick={() => switchPeriod('season')}>Season</button>
           </div>
+          {categories.length > 0 && (
+            <div className="lb-category flex gap-1 shrink-0 overflow-x-auto">
+              <button className={'btn ghost small' + (!category ? ' active' : '')} type="button" onClick={() => switchCategory('')}>All</button>
+              {categories.map(c => (
+                <button key={c.slug} className={'btn ghost small' + (category === c.slug ? ' active' : '')} type="button" onClick={() => switchCategory(c.slug)}>{c.name}</button>
+              ))}
+            </div>
+          )}
           {players.map(p => (
             <div className="lb-row" key={p.id}>
               <span className="lb-rank">{p.rank}</span>
@@ -119,7 +146,7 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
             </div>
           ))}
           {players.length < playerTotal && (
-            <button className="btn ghost lb-more" type="button" disabled={loading} onClick={() => fetchPlayers(playerPage + 1, true, period)}>
+            <button className="btn ghost lb-more" type="button" disabled={loading} onClick={() => fetchPlayers(playerPage + 1, true, period, category)}>
               {loading ? 'Loading\u2026' : 'Load more'}
             </button>
           )}

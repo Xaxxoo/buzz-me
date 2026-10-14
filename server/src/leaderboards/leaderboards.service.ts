@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { University } from '../entities/university.entity';
 import { MatchParticipant } from '../entities/match-participant.entity';
+import { Round } from '../entities/round.entity';
 import { LeaderboardQueryDto } from './dto/leaderboard-query.dto';
 
 @Injectable()
@@ -12,13 +13,32 @@ export class LeaderboardsService {
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(University) private universityRepo: Repository<University>,
     @InjectRepository(MatchParticipant) private participantRepo: Repository<MatchParticipant>,
+    @InjectRepository(Round) private roundRepo: Repository<Round>,
   ) {}
 
+  /** Returns [start, end] dates for the current calendar quarter. */
+  private static currentSeason(): [Date, Date] {
+    const now = new Date();
+    const quarter = Math.floor(now.getMonth() / 3);
+    const start = new Date(now.getFullYear(), quarter * 3, 1);
+    const end = new Date(now.getFullYear(), quarter * 3 + 3, 1);
+    return [start, end];
+  }
+
   async getPlayerBoard(dto: LeaderboardQueryDto) {
-    const { page = 1, limit = 20, university_id, period = 'alltime' } = dto;
+    const { page = 1, limit = 20, university_id, period = 'alltime', category } = dto;
+
+    if (category) {
+      return this.getCategoryPlayerBoard(page, limit, category, university_id);
+    }
 
     if (period === 'weekly') {
-      return this.getWeeklyPlayerBoard(page, limit, university_id);
+      return this.getTimeBoundPlayerBoard(page, limit, new Date(Date.now() - 7 * 24 * 60 * 60_000), undefined, university_id);
+    }
+
+    if (period === 'season') {
+      const [start, end] = LeaderboardsService.currentSeason();
+      return this.getTimeBoundPlayerBoard(page, limit, start, end, university_id);
     }
 
     const qb = this.userRepo
@@ -50,9 +70,8 @@ export class LeaderboardsService {
     };
   }
 
-  private async getWeeklyPlayerBoard(page: number, limit: number, universityId?: string) {
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60_000);
-
+  /** Weekly or season player board — filters match_participants by date range. */
+  private async getTimeBoundPlayerBoard(page: number, limit: number, start: Date, end?: Date, universityId?: string) {
     let qb = this.participantRepo
       .createQueryBuilder('mp')
       .innerJoin('mp.match', 'm')
@@ -63,7 +82,7 @@ export class LeaderboardsService {
       .addSelect('COUNT(*)::int', 'matches_played')
       .addSelect('SUM(CASE WHEN mp.rating_after > mp.rating_before THEN 1 ELSE 0 END)::int', 'matches_won')
       .addSelect('COALESCE(SUM(mp.rating_after - mp.rating_before), 0)::int', 'rating_change')
-      .where('m.ended_at >= :weekAgo', { weekAgo })
+      .where('m.ended_at >= :start', { start })
       .andWhere('m.type != :solo', { solo: 'solo' })
       .groupBy('mp.user_id')
       .addGroupBy('u.username')
@@ -72,6 +91,10 @@ export class LeaderboardsService {
       .orderBy('"rating_change"', 'DESC')
       .offset((page - 1) * limit)
       .limit(limit);
+
+    if (end) {
+      qb = qb.andWhere('m.ended_at < :end', { end });
+    }
 
     if (universityId) {
       qb = qb.andWhere('u.university_id = :universityId', { universityId });
@@ -84,8 +107,12 @@ export class LeaderboardsService {
       .createQueryBuilder('mp')
       .innerJoin('mp.match', 'm')
       .select('COUNT(DISTINCT mp.user_id)::int', 'total')
-      .where('m.ended_at >= :weekAgo', { weekAgo })
+      .where('m.ended_at >= :start', { start })
       .andWhere('m.type != :solo', { solo: 'solo' });
+
+    if (end) {
+      countQb = countQb.andWhere('m.ended_at < :end', { end });
+    }
 
     if (universityId) {
       countQb = countQb
@@ -109,6 +136,76 @@ export class LeaderboardsService {
       total,
       page,
       limit,
+    };
+  }
+
+  /** Per-category leaderboard: ranks players by accuracy (right / total) in a specific category. */
+  private async getCategoryPlayerBoard(page: number, limit: number, categorySlug: string, universityId?: string) {
+    // Use rounds → questions → categories join to compute per-category stats
+    let qb = this.roundRepo
+      .createQueryBuilder('r')
+      .innerJoin('r.question', 'q')
+      .innerJoin('q.category', 'cat')
+      .innerJoin('r.match', 'm')
+      .innerJoinAndSelect(User, 'u', 'r.buzz_user_id = u.id')
+      .select('r.buzz_user_id', 'id')
+      .addSelect('u.username', 'username')
+      .addSelect('u.rating', 'rating')
+      .addSelect('COUNT(*)::int', 'total_answered')
+      .addSelect('SUM(CASE WHEN r.correct = true THEN 1 ELSE 0 END)::int', 'correct_answers')
+      .addSelect('ROUND(SUM(CASE WHEN r.correct = true THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100)::int', 'accuracy')
+      .where('cat.slug = :categorySlug', { categorySlug })
+      .andWhere('r.buzz_user_id IS NOT NULL')
+      .andWhere('m.type != :solo', { solo: 'solo' })
+      .groupBy('r.buzz_user_id')
+      .addGroupBy('u.username')
+      .addGroupBy('u.rating')
+      .having('COUNT(*) >= :min', { min: 5 })
+      .orderBy('"accuracy"', 'DESC')
+      .addOrderBy('"correct_answers"', 'DESC')
+      .offset((page - 1) * limit)
+      .limit(limit);
+
+    if (universityId) {
+      qb = qb.andWhere('u.university_id = :universityId', { universityId });
+    }
+
+    const raw = await qb.getRawMany();
+
+    // Count total
+    let countQb = this.roundRepo
+      .createQueryBuilder('r')
+      .innerJoin('r.question', 'q')
+      .innerJoin('q.category', 'cat')
+      .innerJoin('r.match', 'm')
+      .select('COUNT(DISTINCT r.buzz_user_id)::int', 'total')
+      .where('cat.slug = :categorySlug', { categorySlug })
+      .andWhere('r.buzz_user_id IS NOT NULL')
+      .andWhere('m.type != :solo', { solo: 'solo' });
+
+    if (universityId) {
+      countQb = countQb
+        .innerJoin(User, 'u', 'r.buzz_user_id = u.id')
+        .andWhere('u.university_id = :universityId', { universityId });
+    }
+
+    const countResult = await countQb.getRawOne();
+    const total = countResult?.total ?? 0;
+
+    return {
+      items: raw.map((r, i) => ({
+        rank: (page - 1) * limit + i + 1,
+        id: r.id,
+        username: r.username,
+        rating: Number(r.rating),
+        total_answered: Number(r.total_answered),
+        correct_answers: Number(r.correct_answers),
+        accuracy: Number(r.accuracy),
+      })),
+      total,
+      page,
+      limit,
+      category: categorySlug,
     };
   }
 
