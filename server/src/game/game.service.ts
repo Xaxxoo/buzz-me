@@ -618,7 +618,7 @@ export class GameService {
     room.phase = 'answering';
 
     const buzzer = side === 'a' ? room.playerA : room.playerB;
-    const username = isBot(buzzer) ? buzzer.username : buzzer.username;
+    const username = isBot(buzzer) ? buzzer.username : isTeam(buzzer) ? buzzer.teamName : buzzer.username;
 
     this.emitToRoom(room, 'match:buzzed', { side, username });
 
@@ -1275,10 +1275,15 @@ export class GameService {
 
   handleReconnect(socket: Socket, userId: string, matchId: string): boolean {
     const room = this.rooms.get(matchId);
-    if (!room) return false;
+    if (!room || room.phase === 'finished') return false;
 
     const target = this.findPlayerSlot(room, userId);
     if (!target) return false;
+
+    // Enforce reconnect window
+    if (target.disconnectedAt && Date.now() - target.disconnectedAt > RECONNECT_WINDOW_MS) {
+      return false;
+    }
 
     target.socket = socket;
     target.connected = true;
@@ -1287,6 +1292,16 @@ export class GameService {
 
     const otherSide = target.side === 'a' ? 'b' : 'a';
     this.emitToSide(room, otherSide, 'match:opponent_reconnected', undefined);
+
+    // Send current match state snapshot so the client can re-render
+    socket.emit('match:reconnect_state', {
+      match_id: room.id,
+      round: room.currentRound + 1,
+      total: room.questions.length,
+      score_a: room.playerA.score,
+      score_b: room.playerB.score,
+      phase: room.phase,
+    });
 
     return true;
   }

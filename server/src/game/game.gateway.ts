@@ -32,10 +32,11 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private teamsService: TeamsService,
   ) {}
 
-  /** Emit an event to a user's socket if they are currently connected. */
-  emitToUser(userId: string, event: string, data: any) {
+  /** Emit an event to a user's socket if they are currently connected. Returns true if delivered. */
+  emitToUser(userId: string, event: string, data: any): boolean {
     const socket = this.userSockets.get(userId);
-    if (socket?.connected) socket.emit(event, data);
+    if (socket?.connected) { socket.emit(event, data); return true; }
+    return false;
   }
 
   async handleConnection(client: Socket) {

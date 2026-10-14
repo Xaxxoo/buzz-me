@@ -45,6 +45,7 @@ export interface ServerToClientEvents {
   'match:opponent_disconnected': () => void;
   'match:opponent_reconnected': () => void;
   'match:opponent_forfeited': () => void;
+  'match:reconnect_state': (data: { match_id: string; round: number; total: number; score_a: number; score_b: number; phase: string }) => void;
   'matchmaking:status': (data: { position: number; elapsed_ms: number }) => void;
   'matchmaking:timeout': (data: { offer_bot: boolean }) => void;
   'error': (data: { message: string }) => void;
