@@ -12,6 +12,8 @@ import { MatchesModule } from './matches/matches.module';
 import { LeaderboardsModule } from './leaderboards/leaderboards.module';
 import { TeamsModule } from './teams/teams.module';
 import { GameModule } from './game/game.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { ChallengesModule } from './challenges/challenges.module';
 
 @Module({
   imports: [
@@ -43,6 +45,8 @@ import { GameModule } from './game/game.module';
     LeaderboardsModule,
     TeamsModule,
     GameModule,
+    NotificationsModule,
+    ChallengesModule,
   ],
 })
 export class AppModule {}
