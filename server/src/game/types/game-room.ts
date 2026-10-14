@@ -55,8 +55,9 @@ export type RoomPhase =
 
 export interface GameRoom {
   id: string;
-  type: 'solo' | 'quick' | 'team';
+  type: 'solo' | 'quick' | 'team' | 'challenge';
   ranked: boolean;
+  challengeId?: string;
   playerA: PlayerSlot | TeamSlot;
   playerB: PlayerSlot | BotSlot | TeamSlot;
   questions: RoomQuestion[];
