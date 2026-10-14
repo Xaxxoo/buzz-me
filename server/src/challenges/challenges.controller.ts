@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Query, Body, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Query, Body, UseGuards, Req } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ChallengesService } from './challenges.service';
 import { CreateChallengeDto } from './dto/create-challenge.dto';
@@ -36,6 +36,12 @@ export class ChallengesController {
   @UseGuards(JwtAuthGuard)
   async accept(@Req() req: any, @Param('id') id: string) {
     return this.challengesService.accept(req.user.id, id);
+  }
+
+  @Patch(':id/reschedule')
+  @UseGuards(JwtAuthGuard)
+  async reschedule(@Req() req: any, @Param('id') id: string, @Body('start_at') startAt: string) {
+    return this.challengesService.reschedule(req.user.id, id, startAt);
   }
 
   @Delete(':id')
