@@ -34,6 +34,6 @@ import { UniversityDailyPoints } from '../entities/university-daily-points.entit
     }),
   ],
   providers: [GameGateway, GameService, MatchmakingService, TeamLobbyService, TeamMatchmakingService, ScoringService, UniversityPointsService, ChallengeLobbyService],
-  exports: [GameService, GameGateway],
+  exports: [GameService, GameGateway, ChallengeLobbyService],
 })
 export class GameModule {}

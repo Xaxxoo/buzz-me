@@ -5,16 +5,20 @@ import { randomBytes } from 'crypto';
 import { Challenge } from '../entities/challenge.entity';
 import { User } from '../entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ChallengeLobbyService } from '../game/challenge-lobby.service';
 import { CreateChallengeDto } from './dto/create-challenge.dto';
 
 @Injectable()
 export class ChallengesService implements OnModuleInit {
   private readonly logger = new Logger(ChallengesService.name);
+  /** Tracks which reminders have already been sent: "challengeId:window" */
+  private sentReminders = new Set<string>();
 
   constructor(
     @InjectRepository(Challenge) private challengeRepo: Repository<Challenge>,
     @InjectRepository(User) private userRepo: Repository<User>,
     private notificationsService: NotificationsService,
+    private challengeLobbyService: ChallengeLobbyService,
   ) {}
 
   onModuleInit() {
@@ -124,6 +128,29 @@ export class ChallengesService implements OnModuleInit {
     return this.challengeRepo.save(challenge);
   }
 
+  async reschedule(userId: string, challengeId: string, newStartAt: string) {
+    const challenge = await this.findOne(challengeId);
+    if (challenge.created_by !== userId) {
+      throw new ForbiddenException('Only the creator can reschedule a challenge');
+    }
+    if (challenge.status !== 'expired' && challenge.status !== 'cancelled') {
+      throw new BadRequestException('Only expired or cancelled challenges can be rescheduled');
+    }
+    const startAt = new Date(newStartAt);
+    if (startAt.getTime() <= Date.now()) {
+      throw new BadRequestException('New start time must be in the future');
+    }
+    challenge.start_at = startAt;
+    challenge.status = 'open';
+    challenge.guest_university_id = null;
+
+    // Clear stale reminder tracking so new reminders fire
+    this.sentReminders.delete(`${challengeId}:24h`);
+    this.sentReminders.delete(`${challengeId}:15m`);
+
+    return this.challengeRepo.save(challenge);
+  }
+
   /** Mark the challenge as in-lobby. */
   async setLobby(challengeId: string) {
     await this.challengeRepo.update(challengeId, { status: 'lobby' });
@@ -155,25 +182,45 @@ export class ChallengesService implements OnModuleInit {
   }
 
   private async checkUpcoming() {
-    // Find challenges starting in ~15 minutes that are in accepted state
-    const soon = new Date(Date.now() + 16 * 60_000);
-    const after = new Date(Date.now() + 14 * 60_000);
+    const now = Date.now();
     const upcoming = await this.challengeRepo.find({
       where: { status: 'accepted' },
       relations: ['host_university', 'guest_university'],
     });
+
     for (const ch of upcoming) {
       if (!ch.start_at) continue;
       const startTime = new Date(ch.start_at).getTime();
-      if (startTime > after.getTime() && startTime <= soon.getTime()) {
-        await this.notificationsService.send(
-          ch.created_by,
-          'challenge_starting',
-          'Challenge starting soon',
-          `Your challenge starts in about 15 minutes.`,
-          { challenge_id: ch.id },
-        );
+      const delta = startTime - now;
+
+      // Determine which reminder window we're in
+      let window: '24h' | '15m' | null = null;
+      if (delta > 23 * 60 * 60_000 && delta <= 25 * 60 * 60_000) window = '24h';
+      else if (delta > 14 * 60_000 && delta <= 16 * 60_000) window = '15m';
+      if (!window) continue;
+
+      const key = `${ch.id}:${window}`;
+      if (this.sentReminders.has(key)) continue;
+      this.sentReminders.add(key);
+
+      const title = window === '24h' ? 'Challenge tomorrow' : 'Challenge starting soon';
+      const body = window === '24h'
+        ? `Your challenge starts in about 24 hours.`
+        : `Your challenge starts in about 15 minutes.`;
+
+      // Collect all user IDs to notify: creator + lobby members
+      const userIds = new Set<string>([ch.created_by]);
+      const lobby = this.challengeLobbyService.getLobby(ch.id);
+      if (lobby) {
+        for (const p of [...lobby.hostPlayers, ...lobby.guestPlayers]) {
+          userIds.add(p.userId);
+        }
       }
+
+      for (const userId of userIds) {
+        await this.notificationsService.send(userId, 'challenge_starting', title, body, { challenge_id: ch.id });
+      }
+      this.logger.log(`Sent ${window} reminder for challenge ${ch.id} to ${userIds.size} user(s)`);
     }
   }
 }
