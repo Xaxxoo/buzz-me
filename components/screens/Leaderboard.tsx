@@ -52,6 +52,7 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
   const [playerTotal, setPlayerTotal] = useState(0);
   const [uniTotal, setUniTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -62,6 +63,7 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
 
   const fetchPlayers = useCallback(async (page: number, append: boolean, p: Period, cat: string) => {
     setLoading(true);
+    setError(null);
     try {
       let url = `/leaderboards/players?page=${page}&limit=20&period=${p}`;
       if (cat) url += `&category=${encodeURIComponent(cat)}`;
@@ -69,18 +71,19 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
       setPlayers(prev => append ? [...prev, ...res.items] : res.items);
       setPlayerTotal(res.total);
       setPlayerPage(page);
-    } catch { /* ignore */ }
+    } catch { setError('Failed to load leaderboard.'); }
     setLoading(false);
   }, [auth.api]);
 
   const fetchUniversities = useCallback(async (page: number, append: boolean) => {
     setLoading(true);
+    setError(null);
     try {
       const res = await auth.api.get<{ items: UniversityRow[]; total: number }>(`/leaderboards/universities?page=${page}&limit=20`);
       setUniversities(prev => append ? [...prev, ...res.items] : res.items);
       setUniTotal(res.total);
       setUniPage(page);
-    } catch { /* ignore */ }
+    } catch { setError('Failed to load leaderboard.'); }
     setLoading(false);
   }, [auth.api]);
 
@@ -136,6 +139,12 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
               {categories.map(c => (
                 <button key={c.slug} className={'btn ghost small' + (category === c.slug ? ' active' : '')} type="button" onClick={() => switchCategory(c.slug)}>{c.name}</button>
               ))}
+            </div>
+          )}
+          {error && (
+            <div className="flex flex-col items-center gap-2 py-4">
+              <p style={{ font: '600 14px/1.3 var(--font-body)', color: 'var(--color-buzz)' }}>{error}</p>
+              <button className="btn ghost small" type="button" onClick={() => fetchPlayers(1, false, period, category)}>Retry</button>
             </div>
           )}
           {players.map(p => (

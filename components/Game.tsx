@@ -52,6 +52,16 @@ export default function Game() {
     return () => socket.disconnect();
   }, [socket, auth, authState.status]);
 
+  /* online/offline detection */
+  useEffect(() => {
+    engine.setOnline(navigator.onLine);
+    const goOnline = () => engine.setOnline(true);
+    const goOffline = () => engine.setOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+  }, [engine]);
+
   /* Space buzzes, 1-4 or A-D answers */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -128,11 +138,16 @@ export default function Game() {
     engine.cancelPrivateMatch();
   };
 
+  const [teamsLoading, setTeamsLoading] = useState(false);
+  const [teamsError, setTeamsError] = useState<string | null>(null);
   const fetchMyTeams = async () => {
+    setTeamsLoading(true);
+    setTeamsError(null);
     try {
       const res = await auth.api.get<TeamData[]>('/teams/mine');
       engine.setMyTeams(res);
-    } catch { /* ignore */ }
+    } catch { setTeamsError('Failed to load teams.'); }
+    setTeamsLoading(false);
   };
   const onTeams = () => { engine.showTeams(); fetchMyTeams(); };
   const onCreateTeam = async (name: string) => {
@@ -156,13 +171,36 @@ export default function Game() {
     socket.leaveTeamLobby(teamId);
     engine.backToTeamList();
   };
+  const onRegenerateCode = async (teamId: string) => {
+    try {
+      await auth.api.patch(`/teams/${teamId}/invite-code`);
+      await fetchMyTeams();
+    } catch { /* ignore */ }
+  };
+  const onTransferCaptain = async (teamId: string, newCaptainId: string) => {
+    try {
+      await auth.api.patch(`/teams/${teamId}/captain`, { new_captain_id: newCaptainId });
+      await fetchMyTeams();
+    } catch { /* ignore */ }
+  };
+  const onRemoveMember = async (teamId: string, memberId: string) => {
+    try {
+      await auth.api.del(`/teams/${teamId}/members/${memberId}`);
+      await fetchMyTeams();
+    } catch { /* ignore */ }
+  };
 
   /* ---------- challenges ---------- */
+  const [challengesLoading, setChallengesLoading] = useState(false);
+  const [challengesError, setChallengesError] = useState<string | null>(null);
   const fetchChallenges = async () => {
+    setChallengesLoading(true);
+    setChallengesError(null);
     try {
       const res = await auth.api.get<ChallengeData[]>('/challenges');
       engine.setChallenges(res);
-    } catch { /* ignore */ }
+    } catch { setChallengesError('Failed to load challenges.'); }
+    setChallengesLoading(false);
   };
   const onChallenges = () => { engine.showChallenges(); fetchChallenges(); };
   const onCreateChallenge = async (dto: { categories: string[]; question_count: number; team_size: number; start_at: string | null }) => {
@@ -196,11 +234,14 @@ export default function Game() {
   };
 
   /* ---------- notifications ---------- */
+  const [notifsLoading, setNotifsLoading] = useState(false);
   const fetchNotifications = async () => {
+    setNotifsLoading(true);
     try {
       const res = await auth.api.get<{ items: any[] }>('/notifications');
       engine.setNotifications(res.items);
     } catch { /* ignore */ }
+    setNotifsLoading(false);
   };
   const onNotifOpen = () => { fetchNotifications(); };
   const onMarkAllRead = async () => {
@@ -241,6 +282,8 @@ export default function Game() {
   return (
     <>
       <Backdrop flashKey={flashKey} flashColor={flashColor} />
+      {!s.online && <div className="offline-banner">You&apos;re offline. Some features may not work.</div>}
+      {s.reconnecting && s.online && <div className="reconnecting-banner">Reconnecting&hellip;</div>}
       <main className="stage" id="stage" data-screen={s.screen} ref={stage} style={vars}>
         <div className="flex items-center justify-between min-h-9 shrink-0">
           <span className="mini">{GAME_NAME}</span>
@@ -249,6 +292,7 @@ export default function Game() {
               <NotificationBell
                 notifications={s.notifications}
                 unreadCount={s.unreadCount}
+                loading={notifsLoading}
                 onOpen={onNotifOpen}
                 onMarkAllRead={onMarkAllRead}
               />
@@ -278,9 +322,18 @@ export default function Game() {
           onSetCategories={cats => engine.setCategories(cats)} onSetDifficulty={d => engine.setDifficulty(d)}
           onChoose={sch => engine.choose(sch)} onGo={() => engine.go()} onMenu={() => engine.menu()}
         />
-        <Stats active={s.screen === 's-stats'} save={s.save} you={s.you} onMenu={() => engine.menu()} />
+        <Stats
+          active={s.screen === 's-stats'} save={s.save} you={s.you} onMenu={() => engine.menu()}
+          devices={s.devices}
+          onFetchDevices={authState.status === 'authenticated' ? async () => {
+            try { const res = await auth.api.get<any[]>('/auth/sessions'); engine.setDevices(res); } catch {}
+          } : undefined}
+          onRevokeDevice={authState.status === 'authenticated' ? async (id: string) => {
+            try { await auth.api.del(`/auth/sessions/${id}`); engine.removeDevice(id); } catch {}
+          } : undefined}
+        />
         <Versus active={s.screen === 's-vs'} you={s.you} rival={s.rival} />
-        <Match active={s.screen === 's-match'} s={s} boardKey={String(s.boardKey)} onBuzz={onBuzz} onAnswer={onAnswer} onAcceptBot={onAcceptBot} onDismissBot={onDismissBot} onCancelFind={onCancelFind} onJoinPrivate={(code) => { engine.joinPrivateMatch(); socket.joinPrivateMatch(code); }} onCancelPrivate={onCancelPrivate} />
+        <Match active={s.screen === 's-match'} s={s} boardKey={String(s.boardKey)} onBuzz={onBuzz} onAnswer={onAnswer} onAcceptBot={onAcceptBot} onDismissBot={onDismissBot} onCancelFind={onCancelFind} onJoinPrivate={(code) => { engine.joinPrivateMatch(); socket.joinPrivateMatch(code); }} onCancelPrivate={onCancelPrivate} onTutorialNext={() => engine.tutorialNext()} />
         <Result
           active={s.screen === 's-result'} result={s.result} resultKey={s.resultKey}
           authStatus={authState.status}
@@ -296,6 +349,9 @@ export default function Game() {
           lobby={s.lobby}
           teamFinding={s.teamFinding}
           userId={authState.user?.id ?? null}
+          loading={teamsLoading}
+          error={teamsError}
+          onRetry={fetchMyTeams}
           onMenu={() => engine.menu()}
           onCreateTeam={onCreateTeam}
           onJoinByCode={onJoinByCode}
@@ -308,6 +364,9 @@ export default function Game() {
           onStartFind={(teamId) => socket.teamStartFind(teamId)}
           onCancelFind={(teamId) => socket.teamCancelFind(teamId)}
           onChallenge={(teamId, code) => socket.teamChallenge(teamId, code)}
+          onRegenerateCode={onRegenerateCode}
+          onTransferCaptain={onTransferCaptain}
+          onRemoveMember={onRemoveMember}
         />
         <Challenge
           active={s.screen === 's-challenges'}
@@ -316,6 +375,9 @@ export default function Game() {
           activeChallenge={s.activeChallenge}
           challengeLobby={s.challengeLobby}
           userId={authState.user?.id ?? null}
+          loading={challengesLoading}
+          error={challengesError}
+          onRetry={fetchChallenges}
           onMenu={() => engine.menu()}
           onShowCreate={() => engine.showCreateChallenge()}
           onBackToBoard={() => engine.backToChallengeBoard()}
@@ -327,6 +389,10 @@ export default function Game() {
           onCancelChallenge={onCancelChallenge}
           onReady={(id, ready) => socket.challengeReady(id, ready)}
           onStart={(id) => socket.challengeStart(id)}
+          onSpectate={(challengeId) => {
+            // Join the challenge lobby to receive challenge:live events, then spectate
+            socket.joinChallengeLobby(challengeId);
+          }}
         />
         <Leaderboard active={s.screen === 's-leaderboard'} auth={auth} authStatus={authState.status} onMenu={() => engine.menu()} />
         <UniversityProfile active={s.screen === 's-uni-profile'} profile={s.universityProfile} onMenu={() => engine.menu()} />

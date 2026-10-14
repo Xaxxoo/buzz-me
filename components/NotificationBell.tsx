@@ -6,11 +6,12 @@ import type { NotificationData } from '@/lib/types';
 interface Props {
   notifications: NotificationData[];
   unreadCount: number;
+  loading?: boolean;
   onOpen: () => void;
   onMarkAllRead: () => void;
 }
 
-export function NotificationBell({ notifications, unreadCount, onOpen, onMarkAllRead }: Props) {
+export function NotificationBell({ notifications, unreadCount, loading, onOpen, onMarkAllRead }: Props) {
   const [open, setOpen] = useState(false);
 
   const toggle = () => {
@@ -34,7 +35,9 @@ export function NotificationBell({ notifications, unreadCount, onOpen, onMarkAll
             <b>Notifications</b>
             {unreadCount > 0 && <button className="notif-mark-read" type="button" onClick={onMarkAllRead}>Mark all read</button>}
           </div>
-          {notifications.length === 0 ? (
+          {loading && notifications.length === 0 ? (
+            <p className="notif-empty">Loading&hellip;</p>
+          ) : notifications.length === 0 ? (
             <p className="notif-empty">No notifications yet.</p>
           ) : (
             <div className="notif-list">

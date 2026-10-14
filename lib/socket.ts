@@ -173,7 +173,15 @@ export class SocketClient {
     // Spectate events
     s.on('spectate:state', d => this.engine.onSpectateState(d));
 
+    s.on('disconnect', () => {
+      this.engine.setReconnecting(true);
+    });
+    s.io.on('reconnect_attempt', () => {
+      this.engine.setReconnecting(true);
+    });
+
     s.on('connect', () => {
+      this.engine.setReconnecting(false);
       // On reconnect, rejoin match if one was in progress
       const snap = this.engine.getSnapshot();
       if (snap.screen === 's-match' && snap.matchMode === 'online' && snap.matchId) {

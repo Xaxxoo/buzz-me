@@ -21,9 +21,13 @@ interface Props {
   onCancelChallenge: (id: string) => void;
   onReady: (id: string, ready: boolean) => void;
   onStart: (id: string) => void;
+  onSpectate?: (challengeId: string) => void;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
-function Board({ challenges, onShowCreate, onSelect }: { challenges: ChallengeData[]; onShowCreate: () => void; onSelect: (c: ChallengeData) => void }) {
+function Board({ challenges, onShowCreate, onSelect, loading, error, onRetry }: { challenges: ChallengeData[]; onShowCreate: () => void; onSelect: (c: ChallengeData) => void; loading?: boolean; error?: string | null; onRetry?: () => void }) {
   const open = challenges.filter(c => c.status === 'open' || c.status === 'accepted');
   return (
     <div className="flex flex-col gap-3">
@@ -31,7 +35,14 @@ function Board({ challenges, onShowCreate, onSelect }: { challenges: ChallengeDa
         <h3 style={{ margin: 0, font: '900 16px/1 var(--font-display)' }}>Open Challenges</h3>
         <button className="btn" type="button" onClick={onShowCreate}>Create</button>
       </div>
-      {open.length === 0 && <p style={{ font: '600 14px/1.3 var(--font-body)', opacity: 0.6 }}>No open challenges. Create one to get started.</p>}
+      {error && (
+        <div className="flex flex-col items-center gap-2 py-4">
+          <p style={{ font: '600 14px/1.3 var(--font-body)', color: 'var(--color-buzz)' }}>{error}</p>
+          {onRetry && <button className="btn ghost small" type="button" onClick={onRetry}>Retry</button>}
+        </div>
+      )}
+      {!error && loading && open.length === 0 && <p style={{ font: '600 14px/1.3 var(--font-body)', opacity: 0.6 }}>Loading&hellip;</p>}
+      {!error && !loading && open.length === 0 && <p style={{ font: '600 14px/1.3 var(--font-body)', opacity: 0.6 }}>No open challenges. Create one to get started.</p>}
       <div className="flex flex-col gap-2">
         {open.map(c => (
           <button key={c.id} className="challenge-card" type="button" onClick={() => onSelect(c)}>
@@ -74,13 +85,14 @@ function CreateForm({ onSubmit, onBack }: { onSubmit: (dto: { categories: string
   );
 }
 
-function Detail({ challenge, userId, onBack, onAccept, onJoinLobby, onCancel }: {
+function Detail({ challenge, userId, onBack, onAccept, onJoinLobby, onCancel, onSpectate }: {
   challenge: ChallengeData;
   userId: string | null;
   onBack: () => void;
   onAccept: (id: string) => void;
   onJoinLobby: (id: string) => void;
   onCancel: (id: string) => void;
+  onSpectate?: (id: string) => void;
 }) {
   const isCreator = challenge.created_by === userId;
   const canAccept = challenge.status === 'open' && !isCreator;
@@ -101,9 +113,12 @@ function Detail({ challenge, userId, onBack, onAccept, onJoinLobby, onCancel }: 
           <p style={{ margin: '4px 0' }}>Share code: <b>{challenge.share_code}</b></p>
           {challenge.start_at && <p style={{ margin: '4px 0' }}>Starts: {new Date(challenge.start_at).toLocaleString()}</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {canAccept && <button className="btn" type="button" onClick={() => onAccept(challenge.id)}>Accept Challenge</button>}
           {canJoin && <button className="btn" type="button" onClick={() => onJoinLobby(challenge.id)}>Join Lobby</button>}
+          {onSpectate && challenge.status === 'accepted' && (
+            <button className="btn ghost" type="button" onClick={() => onSpectate(challenge.id)}>Watch</button>
+          )}
           {canCancel && <button className="btn ghost" type="button" onClick={() => onCancel(challenge.id)}>Cancel</button>}
         </div>
       </div>
@@ -111,13 +126,14 @@ function Detail({ challenge, userId, onBack, onAccept, onJoinLobby, onCancel }: 
   );
 }
 
-function Lobby({ challenge, lobby, userId, onLeave, onReady, onStart }: {
+function Lobby({ challenge, lobby, userId, onLeave, onReady, onStart, onSpectate }: {
   challenge: ChallengeData;
   lobby: ChallengeLobbyState | null;
   userId: string | null;
   onLeave: (id: string) => void;
   onReady: (id: string, ready: boolean) => void;
   onStart: (id: string) => void;
+  onSpectate?: (id: string) => void;
 }) {
   const myPlayer = lobby ? [...lobby.hostPlayers, ...lobby.guestPlayers].find(p => p.userId === userId) : null;
   const amReady = myPlayer?.ready ?? false;
@@ -168,7 +184,8 @@ function Lobby({ challenge, lobby, userId, onLeave, onReady, onStart }: {
 export function Challenge({
   active, challengeView, challenges, activeChallenge, challengeLobby, userId,
   onMenu, onShowCreate, onBackToBoard, onSelectChallenge, onCreateChallenge, onAcceptChallenge,
-  onJoinLobby, onLeaveLobby, onCancelChallenge, onReady, onStart,
+  onJoinLobby, onLeaveLobby, onCancelChallenge, onReady, onStart, onSpectate,
+  loading, error, onRetry,
 }: Props) {
   return (
     <section className="screen enter flex-auto min-h-0 flex flex-col gap-3 overflow-y-auto" id="s-challenges" hidden={!active}>
@@ -178,7 +195,7 @@ export function Challenge({
             <button className="back" type="button" onClick={onMenu}>Menu</button>
             <h2>Challenges</h2>
           </div>
-          <Board challenges={challenges} onShowCreate={onShowCreate} onSelect={onSelectChallenge} />
+          <Board challenges={challenges} onShowCreate={onShowCreate} onSelect={onSelectChallenge} loading={loading} error={error} onRetry={onRetry} />
         </>
       )}
       {challengeView === 'create' && (
@@ -192,6 +209,7 @@ export function Challenge({
           onAccept={onAcceptChallenge}
           onJoinLobby={onJoinLobby}
           onCancel={onCancelChallenge}
+          onSpectate={onSpectate}
         />
       )}
       {challengeView === 'lobby' && activeChallenge && (
@@ -202,6 +220,7 @@ export function Challenge({
           onLeave={onLeaveLobby}
           onReady={onReady}
           onStart={onStart}
+          onSpectate={onSpectate}
         />
       )}
     </section>

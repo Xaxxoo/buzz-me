@@ -10,7 +10,11 @@ interface Props {
 }
 
 export function UniversityProfile({ active, profile, onMenu }: Props) {
-  if (!profile) return <section className="screen enter flex-auto min-h-0 flex flex-col gap-3 overflow-y-auto" hidden={!active} />;
+  if (!profile) return (
+    <section className="screen enter flex-auto min-h-0 flex flex-col gap-3 overflow-y-auto" hidden={!active}>
+      {active && <p style={{ font: '600 14px/1.3 var(--font-body)', opacity: 0.6, textAlign: 'center', padding: '20px 0' }}>Loading&hellip;</p>}
+    </section>
+  );
 
   return (
     <section className="screen enter flex-auto min-h-0 flex flex-col gap-3 overflow-y-auto" id="s-uni-profile" hidden={!active}>

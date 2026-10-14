@@ -24,12 +24,20 @@ interface Props {
   onStartFind: (teamId: string) => void;
   onCancelFind: (teamId: string) => void;
   onChallenge: (teamId: string, code: string) => void;
+  onRegenerateCode: (teamId: string) => void;
+  onTransferCaptain: (teamId: string, userId: string) => void;
+  onRemoveMember: (teamId: string, userId: string) => void;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 export function Team({
   active, myTeams, teamView, activeTeam, lobby, teamFinding, userId,
   onMenu, onCreateTeam, onJoinByCode, onSelectTeam, onShowCreate, onBackToList,
   onJoinLobby, onLeaveLobby, onReady, onStartFind, onCancelFind, onChallenge,
+  onRegenerateCode, onTransferCaptain, onRemoveMember,
+  loading, error, onRetry,
 }: Props) {
   const [newName, setNewName] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -57,8 +65,17 @@ export function Team({
       {/* ── List view ── */}
       {teamView === 'list' && (
         <div className="flex flex-col gap-3 flex-auto min-h-0 overflow-y-auto">
-          {myTeams.length === 0 && (
-            <p className="pick-note">You haven't joined any teams yet. Create one or join by code.</p>
+          {error && (
+            <div className="flex flex-col items-center gap-2 py-4">
+              <p style={{ font: '600 14px/1.3 var(--font-body)', color: 'var(--color-buzz)' }}>{error}</p>
+              {onRetry && <button className="btn ghost small" type="button" onClick={onRetry}>Retry</button>}
+            </div>
+          )}
+          {!error && loading && myTeams.length === 0 && (
+            <p className="pick-note">Loading&hellip;</p>
+          )}
+          {!error && !loading && myTeams.length === 0 && (
+            <p className="pick-note">You haven&apos;t joined any teams yet. Create one or join by code.</p>
           )}
           {myTeams.map(team => (
             <button key={team.id} className="team-card" type="button" onClick={() => onSelectTeam(team)}>
@@ -123,6 +140,11 @@ export function Team({
             <span className="code">{lobby?.inviteCode ?? activeTeam.invite_code}</span>
             <span className="copy-hint">{copied ? 'Copied' : 'Tap to copy'}</span>
           </div>
+          {isCaptain && (
+            <button className="btn ghost small" type="button" onClick={() => onRegenerateCode(activeTeam.id)} style={{ alignSelf: 'center' }}>
+              Regenerate Code
+            </button>
+          )}
 
           {/* Members */}
           <div className="flex flex-col gap-2 flex-auto min-h-0 overflow-y-auto">
@@ -132,6 +154,12 @@ export function Team({
                 <span className="flex-1 min-w-0 truncate font-semibold">{m.username}</span>
                 {m.isCaptain && <span className="role-badge">Captain</span>}
                 <span className="text-xs font-bold opacity-60">{num(m.rating)}</span>
+                {isCaptain && m.userId !== userId && (
+                  <div className="flex gap-1 ml-1">
+                    <button className="btn ghost small" type="button" style={{ fontSize: '10px', padding: '2px 6px', minHeight: 0 }} onClick={() => onTransferCaptain(activeTeam!.id, m.userId)}>Make Captain</button>
+                    <button className="btn ghost small" type="button" style={{ fontSize: '10px', padding: '2px 6px', minHeight: 0 }} onClick={() => onRemoveMember(activeTeam!.id, m.userId)}>Remove</button>
+                  </div>
+                )}
               </div>
             ))}
             {!lobby && <p className="pick-note">Connecting to lobby...</p>}
