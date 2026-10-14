@@ -15,4 +15,9 @@ export class UniversitiesController {
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
   }
+
+  @Get(':id/profile')
+  getProfile(@Param('id') id: string) {
+    return this.service.getProfile(id);
+  }
 }

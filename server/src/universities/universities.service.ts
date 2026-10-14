@@ -2,12 +2,16 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike } from 'typeorm';
 import { University } from '../entities/university.entity';
+import { User } from '../entities/user.entity';
+import { Challenge } from '../entities/challenge.entity';
 import { SearchUniversityDto } from './dto/search-university.dto';
 
 @Injectable()
 export class UniversitiesService {
   constructor(
     @InjectRepository(University) private repo: Repository<University>,
+    @InjectRepository(User) private userRepo: Repository<User>,
+    @InjectRepository(Challenge) private challengeRepo: Repository<Challenge>,
   ) {}
 
   async findAll(dto: SearchUniversityDto) {
@@ -31,5 +35,71 @@ export class UniversitiesService {
     const uni = await this.repo.findOneBy({ id });
     if (!uni) throw new NotFoundException('University not found');
     return uni;
+  }
+
+  /** University public profile with top players, recent challenges, and stats. */
+  async getProfile(id: string) {
+    const uni = await this.repo.findOneBy({ id });
+    if (!uni) throw new NotFoundException('University not found');
+
+    // Top 5 players by rating
+    const topPlayers = await this.userRepo.find({
+      where: { university_id: id, university_verified: true },
+      order: { rating: 'DESC' },
+      take: 5,
+      select: ['id', 'username', 'rating', 'matches_played', 'matches_won'],
+    });
+
+    // Player stats
+    const playerCount = await this.userRepo.count({ where: { university_id: id, university_verified: true } });
+    const allPlayers = await this.userRepo.find({
+      where: { university_id: id, university_verified: true },
+      select: ['rating', 'matches_won', 'matches_lost', 'matches_drawn'],
+    });
+    const avgRating = allPlayers.length > 0
+      ? Math.round(allPlayers.reduce((s, p) => s + p.rating, 0) / allPlayers.length)
+      : 1000;
+    const totalWins = allPlayers.reduce((s, p) => s + p.matches_won, 0);
+    const totalLosses = allPlayers.reduce((s, p) => s + p.matches_lost, 0);
+
+    // Recent completed challenges involving this university (last 10)
+    const recentChallenges = await this.challengeRepo
+      .createQueryBuilder('c')
+      .leftJoinAndSelect('c.host_university', 'host')
+      .leftJoinAndSelect('c.guest_university', 'guest')
+      .where('(c.host_university_id = :id OR c.guest_university_id = :id)', { id })
+      .andWhere('c.status = :status', { status: 'completed' })
+      .orderBy('c.updated_at', 'DESC')
+      .take(10)
+      .getMany();
+
+    // Upcoming challenges
+    const upcomingChallenges = await this.challengeRepo
+      .createQueryBuilder('c')
+      .leftJoinAndSelect('c.host_university', 'host')
+      .leftJoinAndSelect('c.guest_university', 'guest')
+      .where('(c.host_university_id = :id OR c.guest_university_id = :id)', { id })
+      .andWhere('c.status IN (:...statuses)', { statuses: ['open', 'accepted'] })
+      .orderBy('c.start_at', 'ASC')
+      .take(5)
+      .getMany();
+
+    // University rank (count universities with more points)
+    const rank = await this.repo
+      .createQueryBuilder('u')
+      .where('u.points > :pts', { pts: uni.points })
+      .getCount() + 1;
+
+    return {
+      ...uni,
+      rank,
+      player_count: playerCount,
+      avg_rating: avgRating,
+      total_wins: totalWins,
+      total_losses: totalLosses,
+      top_players: topPlayers,
+      recent_challenges: recentChallenges,
+      upcoming_challenges: upcomingChallenges,
+    };
   }
 }

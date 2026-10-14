@@ -325,6 +325,22 @@
   /* spectator indicator */
   .spectating-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px; background: var(--color-ink); color: var(--color-paper); font: 700 11px/1 var(--font-display); }
   .spectating-badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--color-buzz); animation: ring 1.2s ease-out infinite; }
+
+  /* university profile */
+  .uni-profile-header { padding: 16px; background: var(--color-paper); border: 3px solid var(--color-ink); border-radius: 16px; }
+  .uni-profile-header h3 { margin: 0 0 12px; font: 900 18px/1.1 var(--font-display); letter-spacing: -.03em; }
+  .uni-profile-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
+  .uni-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .uni-stat b { font: 900 20px/1 var(--font-display); }
+  .uni-stat span { font: 600 11px/1 var(--font-body); opacity: .6; }
+  .uni-record { display: flex; gap: 12px; justify-content: center; font: 700 14px/1 var(--font-display); opacity: .7; }
+  .uni-section { padding: 0; }
+  .uni-section h4 { margin: 0 0 8px; font: 900 14px/1.1 var(--font-display); letter-spacing: -.02em; }
+  .uni-player-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--color-paper); border: 2px solid var(--color-ink); border-radius: 10px; font: 600 13px/1.2 var(--font-body); }
+  .uni-player-rank { font: 900 14px/1 var(--font-display); width: 20px; text-align: center; }
+  .uni-player-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .uni-player-rating { font: 700 13px/1 var(--font-display); }
+  .uni-player-record { font: 600 11px/1 var(--font-body); opacity: .6; }
 }
 
 /* ── Keyframes ── */

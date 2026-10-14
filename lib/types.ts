@@ -82,6 +82,25 @@ export interface ChallengeLobbyState {
   guestReady: boolean;
 }
 
+export interface UniversityProfileData {
+  id: string;
+  name: string;
+  short_name: string;
+  country: string;
+  color_a: string;
+  color_b: string;
+  pattern: string;
+  points: number;
+  rank: number;
+  player_count: number;
+  avg_rating: number;
+  total_wins: number;
+  total_losses: number;
+  top_players: { id: string; username: string; rating: number; matches_played: number; matches_won: number }[];
+  recent_challenges: ChallengeData[];
+  upcoming_challenges: ChallengeData[];
+}
+
 /** A question and its options. The first option is always the right one. */
 export interface QA {
   t: string;

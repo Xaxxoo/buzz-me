@@ -11,6 +11,7 @@ import { Result } from '@/components/screens/Result';
 import { Signup } from '@/components/screens/Signup';
 import { Stats } from '@/components/screens/Stats';
 import { Team } from '@/components/screens/Team';
+import { UniversityProfile } from '@/components/screens/UniversityProfile';
 import { Versus } from '@/components/screens/Versus';
 import { Challenge } from '@/components/screens/Challenge';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -18,7 +19,7 @@ import { AuthClient } from '@/lib/auth';
 import { API_BASE, GAME_NAME } from '@/lib/config';
 import { GameEngine } from '@/lib/engine';
 import { SocketClient } from '@/lib/socket';
-import type { TeamData, ChallengeData } from '@/lib/types';
+import type { TeamData, ChallengeData, UniversityProfileData } from '@/lib/types';
 
 /**
  * The whole game is one client component tree driven by a GameEngine instance.
@@ -178,6 +179,14 @@ export default function Game() {
     } catch { /* ignore */ }
   };
 
+  /* ---------- university profile ---------- */
+  const onViewUniversity = async (universityId: string) => {
+    try {
+      const profile = await auth.api.get<UniversityProfileData>(`/universities/${universityId}/profile`);
+      engine.showUniversityProfile(profile);
+    } catch { /* ignore */ }
+  };
+
   /* ---------- spectate ---------- */
   const onJoinSpectate = (matchId: string) => {
     engine.startSpectating(matchId);
@@ -279,6 +288,7 @@ export default function Game() {
           onStart={(id) => socket.challengeStart(id)}
         />
         <Leaderboard active={s.screen === 's-leaderboard'} auth={auth} authStatus={authState.status} onMenu={() => engine.menu()} />
+        <UniversityProfile active={s.screen === 's-uni-profile'} profile={s.universityProfile} onMenu={() => engine.menu()} />
       </main>
     </>
   );
