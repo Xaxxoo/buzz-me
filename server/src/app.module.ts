@@ -14,6 +14,7 @@ import { TeamsModule } from './teams/teams.module';
 import { GameModule } from './game/game.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ChallengesModule } from './challenges/challenges.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ChallengesModule } from './challenges/challenges.module';
     GameModule,
     NotificationsModule,
     ChallengesModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
