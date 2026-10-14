@@ -96,31 +96,36 @@ export function Match({ active, s, boardKey, onBuzz, onAnswer }: Props) {
         {s.stamp && <div key={s.stamp.key} className="stamp" id="stamp" style={{ '--c': teamColor(s.stamp.team) } as CSSProperties}>{s.stamp.text}</div>}
       </article>
 
+      {s.spectating && <div className="flex justify-center"><span className="spectating-badge">Spectating</span></div>}
       <p className="status" id="status" role="status" aria-live="polite">{s.status}</p>
 
       <div className="zone shrink-0 min-h-[226px] flex flex-col justify-center">
-        <div className="z-buzz flex flex-col items-center gap-3" id="z-buzz" hidden={s.zone !== 'buzz'}>
-          <Meter id="window" k={s.window.key} secs={s.window.secs} hideWhenIdle />
-          <button
-            className={'dome' + (s.buzzLive ? ' live' : '')} id="buzz" type="button" aria-label="Buzz" disabled={!s.buzzLive}
-            onPointerDown={e => { e.preventDefault(); onBuzz(); }} onClick={onBuzz}
-          >
-            <span className="base" /><span className="cap" id="buzzcap">{s.buzzLive ? 'Buzz' : 'Wait'}</span>
-          </button>
-        </div>
+        {!s.spectating && (
+          <div className="z-buzz flex flex-col items-center gap-3" id="z-buzz" hidden={s.zone !== 'buzz'}>
+            <Meter id="window" k={s.window.key} secs={s.window.secs} hideWhenIdle />
+            <button
+              className={'dome' + (s.buzzLive ? ' live' : '')} id="buzz" type="button" aria-label="Buzz" disabled={!s.buzzLive}
+              onPointerDown={e => { e.preventDefault(); onBuzz(); }} onClick={onBuzz}
+            >
+              <span className="base" /><span className="cap" id="buzzcap">{s.buzzLive ? 'Buzz' : 'Wait'}</span>
+            </button>
+          </div>
+        )}
 
-        <div className="z-opts flex flex-col gap-2" id="z-opts" hidden={s.zone !== 'opts'}>
-          {s.ask && <>
-            <Meter id="timer" k={s.ask.key} secs={s.ask.secs} paused={s.ask.paused} />
-            <div className="opts" id="opts">
-              {s.ask.options.map((o, i) => (
-                <button key={`${s.ask!.key}-${i}`} type="button" className={'opt' + (o.mark ? ' ' + o.mark : '')} disabled={o.disabled} onClick={() => onAnswer(o.text)}>
-                  <span className="key">{'ABCD'[i]}</span><span className="txt">{o.text}</span>
-                </button>
-              ))}
-            </div>
-          </>}
-        </div>
+        {!s.spectating && (
+          <div className="z-opts flex flex-col gap-2" id="z-opts" hidden={s.zone !== 'opts'}>
+            {s.ask && <>
+              <Meter id="timer" k={s.ask.key} secs={s.ask.secs} paused={s.ask.paused} />
+              <div className="opts" id="opts">
+                {s.ask.options.map((o, i) => (
+                  <button key={`${s.ask!.key}-${i}`} type="button" className={'opt' + (o.mark ? ' ' + o.mark : '')} disabled={o.disabled} onClick={() => onAnswer(o.text)}>
+                    <span className="key">{'ABCD'[i]}</span><span className="txt">{o.text}</span>
+                  </button>
+                ))}
+              </div>
+            </>}
+          </div>
+        )}
 
         <div className="z-rival flex items-center gap-3.5 justify-center" id="z-rival" hidden={s.zone !== 'rival'}>
           {s.rival && s.rivalView && <>

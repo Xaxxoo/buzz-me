@@ -12,11 +12,13 @@ import { Signup } from '@/components/screens/Signup';
 import { Stats } from '@/components/screens/Stats';
 import { Team } from '@/components/screens/Team';
 import { Versus } from '@/components/screens/Versus';
+import { Challenge } from '@/components/screens/Challenge';
+import { NotificationBell } from '@/components/NotificationBell';
 import { AuthClient } from '@/lib/auth';
 import { API_BASE, GAME_NAME } from '@/lib/config';
 import { GameEngine } from '@/lib/engine';
 import { SocketClient } from '@/lib/socket';
-import type { TeamData } from '@/lib/types';
+import type { TeamData, ChallengeData } from '@/lib/types';
 
 /**
  * The whole game is one client component tree driven by a GameEngine instance.
@@ -123,6 +125,69 @@ export default function Game() {
     engine.backToTeamList();
   };
 
+  /* ---------- challenges ---------- */
+  const fetchChallenges = async () => {
+    try {
+      const res = await auth.api.get<ChallengeData[]>('/challenges');
+      engine.setChallenges(res);
+    } catch { /* ignore */ }
+  };
+  const onChallenges = () => { engine.showChallenges(); fetchChallenges(); };
+  const onCreateChallenge = async (dto: { categories: string[]; question_count: number; team_size: number; start_at: string | null }) => {
+    try {
+      const created = await auth.api.post<ChallengeData>('/challenges', dto);
+      await fetchChallenges();
+      engine.showChallengeDetail(created);
+    } catch { /* ignore */ }
+  };
+  const onAcceptChallenge = async (id: string) => {
+    try {
+      const updated = await auth.api.post<ChallengeData>(`/challenges/${id}/accept`);
+      engine.showChallengeLobby(updated);
+      socket.joinChallengeLobby(id);
+    } catch { /* ignore */ }
+  };
+  const onJoinChallengeLobby = (id: string) => {
+    const ch = s.challenges.find(c => c.id === id) || s.activeChallenge;
+    if (ch) { engine.showChallengeLobby(ch); socket.joinChallengeLobby(id); }
+  };
+  const onLeaveChallengeLobby = (id: string) => {
+    socket.leaveChallengeLobby(id);
+    engine.backToChallengeBoard();
+  };
+  const onCancelChallenge = async (id: string) => {
+    try {
+      await auth.api.del(`/challenges/${id}`);
+      await fetchChallenges();
+      engine.backToChallengeBoard();
+    } catch { /* ignore */ }
+  };
+
+  /* ---------- notifications ---------- */
+  const fetchNotifications = async () => {
+    try {
+      const res = await auth.api.get<{ items: any[] }>('/notifications');
+      engine.setNotifications(res.items);
+    } catch { /* ignore */ }
+  };
+  const onNotifOpen = () => { fetchNotifications(); };
+  const onMarkAllRead = async () => {
+    try {
+      await auth.api.put('/notifications/read-all');
+      engine.markNotificationsRead();
+    } catch { /* ignore */ }
+  };
+
+  /* ---------- spectate ---------- */
+  const onJoinSpectate = (matchId: string) => {
+    engine.startSpectating(matchId);
+    socket.joinSpectate(matchId);
+  };
+  const onLeaveSpectate = () => {
+    if (s.spectateMatchId) socket.leaveSpectate(s.spectateMatchId);
+    engine.stopSpectating();
+  };
+
   return (
     <>
       <Backdrop flashKey={flashKey} flashColor={flashColor} />
@@ -130,6 +195,14 @@ export default function Game() {
         <div className="flex items-center justify-between min-h-9 shrink-0">
           <span className="mini">{GAME_NAME}</span>
           <div className="flex items-center gap-2">
+            {authState.status === 'authenticated' && (
+              <NotificationBell
+                notifications={s.notifications}
+                unreadCount={s.unreadCount}
+                onOpen={onNotifOpen}
+                onMarkAllRead={onMarkAllRead}
+              />
+            )}
             {authState.status === 'authenticated' && <span className="auth-bar">{authState.user?.username}</span>}
             <button className="sound" id="sound" type="button" aria-pressed={s.muted} aria-label={s.muted ? 'Turn sound on' : 'Mute sound'} onClick={() => engine.toggleMute()}>
               <svg className="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
@@ -147,7 +220,7 @@ export default function Game() {
           authStatus={authState.status} username={authState.user?.username ?? null}
           onPlay={() => engine.play()} onDaily={() => engine.daily()} onStats={() => engine.showStats()}
           onSignIn={() => engine.showLogin()} onQuickMatch={onQuickMatch} onLeaderboard={() => engine.showLeaderboard()}
-          onTeams={onTeams}
+          onTeams={onTeams} onChallenges={onChallenges}
         />
         <Picker
           key={s.pickKey} active={s.screen === 's-pick'} you={s.you} forDaily={s.pending === 'daily'}
@@ -185,6 +258,25 @@ export default function Game() {
           onStartFind={(teamId) => socket.teamStartFind(teamId)}
           onCancelFind={(teamId) => socket.teamCancelFind(teamId)}
           onChallenge={(teamId, code) => socket.teamChallenge(teamId, code)}
+        />
+        <Challenge
+          active={s.screen === 's-challenges'}
+          challengeView={s.challengeView}
+          challenges={s.challenges}
+          activeChallenge={s.activeChallenge}
+          challengeLobby={s.challengeLobby}
+          userId={authState.user?.id ?? null}
+          onMenu={() => engine.menu()}
+          onShowCreate={() => engine.showCreateChallenge()}
+          onBackToBoard={() => engine.backToChallengeBoard()}
+          onSelectChallenge={(c) => engine.showChallengeDetail(c)}
+          onCreateChallenge={onCreateChallenge}
+          onAcceptChallenge={onAcceptChallenge}
+          onJoinLobby={onJoinChallengeLobby}
+          onLeaveLobby={onLeaveChallengeLobby}
+          onCancelChallenge={onCancelChallenge}
+          onReady={(id, ready) => socket.challengeReady(id, ready)}
+          onStart={(id) => socket.challengeStart(id)}
         />
         <Leaderboard active={s.screen === 's-leaderboard'} auth={auth} authStatus={authState.status} onMenu={() => engine.menu()} />
       </main>
