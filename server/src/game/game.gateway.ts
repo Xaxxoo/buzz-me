@@ -81,6 +81,8 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Clean up challenge lobby if disconnected
     const cLobby = this.challengeLobbyService.getLobbyByUser(user.id);
     if (cLobby) this.challengeLobbyService.leaveLobby(cLobby.challengeId, user.id, this.server);
+    this.gameService.cleanupPrivateCodes(user.id);
+    this.gameService.cleanupPlayerChallenges(user.id);
     this.gameService.handleDisconnect(user.id);
   }
 
@@ -166,6 +168,101 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const success = this.gameService.handleReconnect(client, user.id, data.match_id);
     if (!success) {
       client.emit('error', { message: 'Match not found or expired' });
+    }
+  }
+
+  // ---------- Online players ----------
+
+  @SubscribeMessage('players:online')
+  async handleOnlinePlayers(@ConnectedSocket() client: Socket) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    const onlineIds = Array.from(this.userSockets.keys()).filter(id => id !== user.id);
+    // Batch-fetch usernames and ratings
+    const players: { id: string; username: string; rating: number }[] = [];
+    for (const id of onlineIds.slice(0, 50)) {
+      const socket = this.userSockets.get(id);
+      const socketUser = socket ? (socket as any).user : null;
+      if (!socketUser) continue;
+      const dbUser = await this.gameService.getDbUser(id);
+      players.push({ id, username: socketUser.username, rating: dbUser?.rating || 1000 });
+    }
+    client.emit('players:online_list', { players });
+  }
+
+  // ---------- Direct player challenge ----------
+
+  @SubscribeMessage('match:challenge_player')
+  async handleChallengePlayer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { target_user_id: string },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    const dbUser = await this.gameService.getDbUser(user.id);
+    const sent = this.gameService.sendPlayerChallenge(
+      client,
+      { id: user.id, username: user.username },
+      data.target_user_id,
+      {
+        emitToUser: (userId, event, d) => {
+          // Enrich with rating
+          if (event === 'match:challenge_received') {
+            d.from_rating = dbUser?.rating || 1000;
+          }
+          return this.emitToUser(userId, event, d);
+        },
+      },
+    );
+    if (!sent) {
+      client.emit('error', { message: 'Player is offline or in a match' });
+    }
+  }
+
+  @SubscribeMessage('match:challenge_respond')
+  async handleChallengeRespond(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { from_user_id: string; accept: boolean },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    await this.gameService.respondPlayerChallenge(
+      client,
+      { id: user.id, username: user.username },
+      data.from_user_id,
+      data.accept,
+    );
+  }
+
+  // ---------- Private (friendly) match handlers ----------
+
+  @SubscribeMessage('match:create_private')
+  handleCreatePrivate(@ConnectedSocket() client: Socket) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    const code = this.gameService.createPrivateCode(client, user);
+    client.emit('match:private_created', { code });
+  }
+
+  @SubscribeMessage('match:join_private')
+  async handleJoinPrivate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { code: string },
+  ) {
+    const user = (client as any).user;
+    if (!user) return;
+
+    const room = await this.gameService.joinPrivateRoom(
+      (data.code || '').toUpperCase(),
+      client,
+      user,
+    );
+    if (!room) {
+      client.emit('error', { message: 'Invalid or expired room code' });
     }
   }
 

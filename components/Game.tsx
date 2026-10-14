@@ -113,6 +113,21 @@ export default function Game() {
   const onDismissBot = () => engine.dismissBotOffer();
   const onCancelFind = () => { socket.cancelFind(); engine.cancelFind(); };
 
+  /* ---------- friendly (private) match ---------- */
+  const [joinCode, setJoinCode] = useState('');
+  const onFriendly = () => {
+    engine.startPrivateMatch();
+    socket.createPrivateMatch();
+  };
+  const onJoinPrivate = () => {
+    if (!joinCode.trim()) return;
+    engine.joinPrivateMatch();
+    socket.joinPrivateMatch(joinCode.trim());
+  };
+  const onCancelPrivate = () => {
+    engine.cancelPrivateMatch();
+  };
+
   const fetchMyTeams = async () => {
     try {
       const res = await auth.api.get<TeamData[]>('/teams/mine');
@@ -213,6 +228,16 @@ export default function Game() {
     engine.stopSpectating();
   };
 
+  /* ---------- direct player challenge ---------- */
+  const onAcceptPlayerChallenge = (fromUserId: string) => {
+    socket.respondChallenge(fromUserId, true);
+    engine.acceptedChallenge();
+  };
+  const onDeclinePlayerChallenge = (fromUserId: string) => {
+    socket.respondChallenge(fromUserId, false);
+    engine.dismissChallenge();
+  };
+
   return (
     <>
       <Backdrop flashKey={flashKey} flashColor={flashColor} />
@@ -245,7 +270,7 @@ export default function Game() {
           authStatus={authState.status} username={authState.user?.username ?? null}
           onPlay={() => engine.play()} onDaily={() => engine.daily()} onStats={() => engine.showStats()}
           onSignIn={() => engine.showLogin()} onQuickMatch={onQuickMatch} onLeaderboard={() => engine.showLeaderboard()}
-          onTeams={onTeams} onChallenges={onChallenges}
+          onTeams={onTeams} onChallenges={onChallenges} onFriendly={onFriendly}
         />
         <Picker
           key={s.pickKey} active={s.screen === 's-pick'} you={s.you} forDaily={s.pending === 'daily'}
@@ -255,7 +280,7 @@ export default function Game() {
         />
         <Stats active={s.screen === 's-stats'} save={s.save} you={s.you} onMenu={() => engine.menu()} />
         <Versus active={s.screen === 's-vs'} you={s.you} rival={s.rival} />
-        <Match active={s.screen === 's-match'} s={s} boardKey={String(s.boardKey)} onBuzz={onBuzz} onAnswer={onAnswer} onAcceptBot={onAcceptBot} onDismissBot={onDismissBot} onCancelFind={onCancelFind} />
+        <Match active={s.screen === 's-match'} s={s} boardKey={String(s.boardKey)} onBuzz={onBuzz} onAnswer={onAnswer} onAcceptBot={onAcceptBot} onDismissBot={onDismissBot} onCancelFind={onCancelFind} onJoinPrivate={(code) => { engine.joinPrivateMatch(); socket.joinPrivateMatch(code); }} onCancelPrivate={onCancelPrivate} />
         <Result
           active={s.screen === 's-result'} result={s.result} resultKey={s.resultKey}
           authStatus={authState.status}
@@ -305,6 +330,16 @@ export default function Game() {
         />
         <Leaderboard active={s.screen === 's-leaderboard'} auth={auth} authStatus={authState.status} onMenu={() => engine.menu()} />
         <UniversityProfile active={s.screen === 's-uni-profile'} profile={s.universityProfile} onMenu={() => engine.menu()} />
+
+        {s.incomingChallenge && (
+          <div className="challenge-toast">
+            <p><b>{s.incomingChallenge.fromUsername}</b> ({s.incomingChallenge.fromRating}) wants to play!</p>
+            <div className="flex gap-2">
+              <button className="btn small" type="button" onClick={() => onAcceptPlayerChallenge(s.incomingChallenge!.fromUserId)}>Accept</button>
+              <button className="btn ghost small" type="button" onClick={() => onDeclinePlayerChallenge(s.incomingChallenge!.fromUserId)}>Decline</button>
+            </div>
+          </div>
+        )}
       </main>
     </>
   );

@@ -59,6 +59,25 @@ export class SocketClient {
     this.socket?.emit('match:answer', { option_index: index });
   }
 
+  /* ---------- direct player challenge ---------- */
+  fetchOnlinePlayers() {
+    this.socket?.emit('players:online');
+  }
+  challengePlayer(targetUserId: string) {
+    this.socket?.emit('match:challenge_player', { target_user_id: targetUserId });
+  }
+  respondChallenge(fromUserId: string, accept: boolean) {
+    this.socket?.emit('match:challenge_respond', { from_user_id: fromUserId, accept });
+  }
+
+  /* ---------- private (friendly) match ---------- */
+  createPrivateMatch() {
+    this.socket?.emit('match:create_private');
+  }
+  joinPrivateMatch(code: string) {
+    this.socket?.emit('match:join_private', { code });
+  }
+
   /* ---------- team client→server ---------- */
   joinTeamLobby(teamId: string) {
     this.socket?.emit('team:join_lobby', { team_id: teamId });
@@ -126,6 +145,16 @@ export class SocketClient {
     s.on('match:reconnect_state', d => this.engine.onlineReconnectState(d));
     s.on('matchmaking:status', d => this.engine.onlineMatchmakingStatus(d));
     s.on('matchmaking:timeout', d => this.engine.onlineMatchmakingTimeout(d));
+
+    // Direct player challenge events
+    s.on('players:online_list', d => this.engine.onOnlinePlayers(d));
+    s.on('match:challenge_received', d => this.engine.onChallengeReceived(d));
+    s.on('match:challenge_declined', d => this.engine.onChallengeDeclined(d));
+    s.on('match:challenge_cancelled', () => this.engine.onChallengeCancelled());
+
+    // Private match events
+    s.on('match:private_created', d => this.engine.onPrivateCreated(d));
+    s.on('private:expired', d => this.engine.onPrivateExpired(d));
 
     // Team events
     s.on('team:lobby_update', d => this.engine.onTeamLobbyUpdate(d));

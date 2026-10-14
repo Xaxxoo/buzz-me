@@ -6,6 +6,11 @@ export interface ClientToServerEvents {
   'match:buzz': (data: { timestamp: number }) => void;
   'match:answer': (data: { option_index: number }) => void;
   'match:reconnect': (data: { match_id: string }) => void;
+  'match:create_private': () => void;
+  'match:join_private': (data: { code: string }) => void;
+  'match:challenge_player': (data: { target_user_id: string }) => void;
+  'match:challenge_respond': (data: { from_user_id: string; accept: boolean }) => void;
+  'players:online': () => void;
   'team:join_lobby': (data: { team_id: string }) => void;
   'team:leave_lobby': (data: { team_id: string }) => void;
   'team:ready': (data: { team_id: string; ready: boolean }) => void;
@@ -61,6 +66,12 @@ export interface ServerToClientEvents {
   'match:reconnect_state': (data: { match_id: string; round: number; total: number; score_a: number; score_b: number; phase: string }) => void;
   'matchmaking:status': (data: { position: number; elapsed_ms: number }) => void;
   'matchmaking:timeout': (data: { offer_bot: boolean }) => void;
+  'match:private_created': (data: { code: string }) => void;
+  'private:expired': (data: { code: string }) => void;
+  'match:challenge_received': (data: { from_user_id: string; from_username: string; from_rating: number }) => void;
+  'match:challenge_declined': (data: { target_user_id: string }) => void;
+  'match:challenge_cancelled': () => void;
+  'players:online_list': (data: { players: { id: string; username: string; rating: number }[] }) => void;
   'error': (data: { message: string }) => void;
   'notification:new': (data: { id: string; type: string; title: string; body: string; data: Record<string, any>; created_at: string }) => void;
   'team:lobby_update': (data: TeamLobbyUpdate) => void;

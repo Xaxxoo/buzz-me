@@ -47,6 +47,29 @@ function TeamPanel({ team, school, score, seat }: { team: Team; school: School; 
   );
 }
 
+function PrivateMatchPanel({ code, onJoin, onCancel }: { code: string | null; onJoin?: (code: string) => void; onCancel?: () => void }) {
+  const [joinCode, setJoinCode] = useState('');
+  return (
+    <div className="private-panel flex flex-col items-center gap-3">
+      {code && (
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-sm">Your room code:</span>
+          <span className="private-code">{code}</span>
+          <span className="text-xs opacity-70">Share this with your opponent</span>
+        </div>
+      )}
+      <div className="flex flex-col items-center gap-2">
+        <span className="text-sm">Or join someone else&apos;s room:</span>
+        <div className="flex gap-2">
+          <input className="code-input" type="text" maxLength={6} placeholder="Enter code" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} />
+          <button className="btn small" type="button" disabled={joinCode.length < 4} onClick={() => onJoin?.(joinCode)}>Join</button>
+        </div>
+      </div>
+      <button className="btn ghost small" type="button" onClick={onCancel}>Cancel</button>
+    </div>
+  );
+}
+
 interface Props {
   active: boolean;
   s: GameState;
@@ -56,9 +79,11 @@ interface Props {
   onAcceptBot?: () => void;
   onDismissBot?: () => void;
   onCancelFind?: () => void;
+  onJoinPrivate?: (code: string) => void;
+  onCancelPrivate?: () => void;
 }
 
-export function Match({ active, s, boardKey, onBuzz, onAnswer, onAcceptBot, onDismissBot, onCancelFind }: Props) {
+export function Match({ active, s, boardKey, onBuzz, onAnswer, onAcceptBot, onDismissBot, onCancelFind, onJoinPrivate, onCancelPrivate }: Props) {
   const qtext = useRef<HTMLParagraphElement>(null);
   const solo = s.mode === 'daily';
   const cardKey = `${s.qi}-${s.bonusCard ? 'b' : 't'}`;
@@ -110,6 +135,10 @@ export function Match({ active, s, boardKey, onBuzz, onAnswer, onAcceptBot, onDi
           </div>
           <button className="btn ghost small" type="button" onClick={onCancelFind}>Cancel</button>
         </div>
+      )}
+
+      {s.privateWaiting && (
+        <PrivateMatchPanel code={s.privateCode} onJoin={onJoinPrivate} onCancel={onCancelPrivate} />
       )}
 
       <div className="zone shrink-0 min-h-[226px] flex flex-col justify-center">

@@ -101,6 +101,13 @@ export interface GameState {
   challenges: ChallengeData[];
   activeChallenge: ChallengeData | null;
   challengeLobby: ChallengeLobbyState | null;
+  /* private match */
+  privateCode: string | null;
+  privateWaiting: boolean;
+  /* direct player challenge */
+  onlinePlayers: { id: string; username: string; rating: number }[];
+  incomingChallenge: { fromUserId: string; fromUsername: string; fromRating: number } | null;
+  challengeSent: boolean;
   /* spectating */
   spectating: boolean;
   spectateMatchId: string | null;
@@ -132,6 +139,8 @@ const initial = (): GameState => ({
   teamView: 'list', myTeams: [], activeTeam: null, lobby: null, teamFinding: false,
   notifications: [], unreadCount: 0,
   challengeView: 'board', challenges: [], activeChallenge: null, challengeLobby: null,
+  privateCode: null, privateWaiting: false,
+  onlinePlayers: [], incomingChallenge: null, challengeSent: false,
   spectating: false, spectateMatchId: null,
   universityProfile: null,
 });
@@ -306,6 +315,60 @@ export class GameEngine {
   cancelFind() {
     if (this.findTimer) { clearInterval(this.findTimer); this.findTimer = null; }
     this.set({ finding: false });
+    this.menu();
+  }
+
+  /* ---------- direct player challenge ---------- */
+  onOnlinePlayers(data: { players: { id: string; username: string; rating: number }[] }) {
+    this.set({ onlinePlayers: data.players });
+  }
+  sendPlayerChallenge() {
+    this.set({ challengeSent: true });
+    this.status('Challenge sent. Waiting for response\u2026');
+  }
+  onChallengeReceived(data: { from_user_id: string; from_username: string; from_rating: number }) {
+    this.set({
+      incomingChallenge: { fromUserId: data.from_user_id, fromUsername: data.from_username, fromRating: data.from_rating },
+    });
+  }
+  onChallengeDeclined(_data: { target_user_id: string }) {
+    this.set({ challengeSent: false });
+    this.status('Challenge declined.');
+  }
+  onChallengeCancelled() {
+    this.set({ incomingChallenge: null });
+  }
+  dismissChallenge() {
+    this.set({ incomingChallenge: null });
+  }
+  acceptedChallenge() {
+    // Match will arrive via match:found
+    this.set({ incomingChallenge: null, finding: true, matchMode: 'online', status: 'Starting match\u2026' });
+  }
+
+  /* ---------- private (friendly) match ---------- */
+  startPrivateMatch() {
+    this.cut();
+    this.phase = 'idle';
+    this.set({ screen: 's-match', privateWaiting: true, privateCode: null, finding: false, matchMode: 'online', matchId: null, opponentName: null, status: 'Creating private room\u2026', zone: 'none', buzzLive: false, tag: '', words: [], answer: null, bonusCard: false });
+  }
+  onPrivateCreated(data: { code: string }) {
+    this.set({ privateCode: data.code, status: `Room code: ${data.code}. Share it with your opponent.` });
+  }
+  onPrivateExpired(_data: { code: string }) {
+    if (this.state.privateWaiting) {
+      this.set({ privateWaiting: false, privateCode: null });
+      this.status('Room code expired.');
+      this.menu();
+    }
+  }
+  joinPrivateMatch() {
+    this.cut();
+    this.phase = 'idle';
+    this.set({ screen: 's-match', finding: true, matchMode: 'online', matchId: null, opponentName: null, status: 'Joining private room\u2026', zone: 'none', buzzLive: false, tag: '', words: [], answer: null, bonusCard: false });
+  }
+  cancelPrivateMatch() {
+    this.set({ privateWaiting: false, privateCode: null });
     this.menu();
   }
 
@@ -650,7 +713,8 @@ export class GameEngine {
       : { id: opp.username, name: opp.username, country: '', short: opp.username.slice(0, 10), a: '#1763B8', b: '#0E4D8E', pat: 'chief' };
     this.tally = { won: 0, bonus: 0, best: null };
     this.set({
-      finding: false, matchMode: 'online', matchId: data.match_id, opponentName: opp.username,
+      finding: false, privateWaiting: false, privateCode: null,
+      matchMode: 'online', matchId: data.match_id, opponentName: opp.username,
       rival, screen: 's-vs',
     });
     sfx.slam(); setTimeout(() => sfx.slam(), 180);

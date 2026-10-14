@@ -26,6 +26,10 @@ export class GameService {
   private userRooms = new Map<string, string>(); // userId -> roomId
   private timers = new Map<string, Map<number, NodeJS.Timeout>>(); // roomId -> epoch -> timer
   private spectators = new Map<string, Set<import('socket.io').Socket>>(); // roomId -> spectator sockets
+  /** Private room codes: code → { roomId, host socket, host user } */
+  private privateCodes = new Map<string, { hostSocket: Socket; hostUser: { id: string; username: string } }>();
+  /** Pending 1v1 challenges: targetUserId → challenger info */
+  private pendingChallenges = new Map<string, { socket: Socket; user: { id: string; username: string }; timer: NodeJS.Timeout }>();
 
   constructor(
     private scoring: ScoringService,
@@ -211,6 +215,275 @@ export class GameService {
 
     this.startCountdown(room);
     return room;
+  }
+
+  /** Create a private (friendly, unranked) room and return the join code. */
+  createPrivateCode(socket: Socket, user: { id: string; username: string }): string {
+    // Generate a short 6-char alphanumeric code
+    const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+    this.privateCodes.set(code, { hostSocket: socket, hostUser: user });
+    // Expire the code after 5 minutes
+    setTimeout(() => {
+      if (this.privateCodes.has(code)) {
+        this.privateCodes.delete(code);
+        socket.emit('private:expired', { code });
+      }
+    }, 5 * 60_000);
+    return code;
+  }
+
+  /** Join a private room by code. Returns the created room or null if code is invalid. */
+  async joinPrivateRoom(code: string, socket: Socket, user: { id: string; username: string }): Promise<GameRoom | null> {
+    const entry = this.privateCodes.get(code);
+    if (!entry) return null;
+    this.privateCodes.delete(code);
+
+    const [dbA, dbB] = await Promise.all([
+      this.userRepo.findOneBy({ id: entry.hostUser.id }),
+      this.userRepo.findOneBy({ id: user.id }),
+    ]);
+    const questions = await this.questionsService.getRandomSet(ROUNDS);
+
+    const roomId = `private_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const roomQuestions: RoomQuestion[] = questions.map((q) => ({
+      id: q.id,
+      categoryId: q.category_id,
+      categoryName: q.category?.name || '',
+      text: q.text,
+      words: q.text.split(' '),
+      options: q.options,
+      correctIndex: q.correct_option_index,
+      bonusText: q.bonus_text,
+      bonusOptions: q.bonus_options,
+    }));
+
+    const room: GameRoom = {
+      id: roomId,
+      type: 'quick',
+      ranked: false,
+      playerA: {
+        userId: entry.hostUser.id,
+        username: entry.hostUser.username,
+        rating: dbA?.rating || 1000,
+        universityId: dbA?.university_id || null,
+        socket: entry.hostSocket,
+        score: 0,
+        side: 'a',
+        connected: true,
+        disconnectedAt: null,
+        rtt: 0,
+      },
+      playerB: {
+        userId: user.id,
+        username: user.username,
+        rating: dbB?.rating || 1000,
+        universityId: dbB?.university_id || null,
+        socket,
+        score: 0,
+        side: 'b',
+        connected: true,
+        disconnectedAt: null,
+        rtt: 0,
+      },
+      questions: roomQuestions,
+      currentRound: 0,
+      phase: 'countdown',
+      epoch: 0,
+      buzzedSide: null,
+      buzzedEarly: false,
+      buzzOpenAt: null,
+      wordIndex: 0,
+      answeredCorrectly: null,
+      answeredOption: null,
+      createdAt: Date.now(),
+    };
+
+    this.rooms.set(roomId, room);
+    this.userRooms.set(entry.hostUser.id, roomId);
+    this.userRooms.set(user.id, roomId);
+    this.timers.set(roomId, new Map());
+
+    entry.hostSocket.join(roomId);
+    socket.join(roomId);
+
+    const opponentInfoForA = { id: user.id, username: user.username, rating: dbB?.rating || 1000 };
+    const opponentInfoForB = { id: entry.hostUser.id, username: entry.hostUser.username, rating: dbA?.rating || 1000 };
+    entry.hostSocket.emit('match:found', { match_id: roomId, opponent: opponentInfoForA, you_side: 'a' });
+    socket.emit('match:found', { match_id: roomId, opponent: opponentInfoForB, you_side: 'b' });
+
+    this.startCountdown(room);
+    return room;
+  }
+
+  /** Clean up private codes on disconnect. */
+  cleanupPrivateCodes(userId: string) {
+    for (const [code, entry] of this.privateCodes) {
+      if (entry.hostUser.id === userId) {
+        this.privateCodes.delete(code);
+      }
+    }
+  }
+
+  /** Send a 1v1 challenge to another player. Returns false if target is offline or busy. */
+  sendPlayerChallenge(
+    challengerSocket: Socket,
+    challenger: { id: string; username: string },
+    targetUserId: string,
+    gateway: { emitToUser: (userId: string, event: string, data: any) => boolean },
+  ): boolean {
+    // Can't challenge yourself
+    if (challenger.id === targetUserId) return false;
+    // Can't if already in a match
+    if (this.userRooms.has(challenger.id) || this.userRooms.has(targetUserId)) return false;
+    // Cancel any existing outgoing challenge from this user
+    this.cancelPlayerChallenge(challenger.id);
+
+    const sent = gateway.emitToUser(targetUserId, 'match:challenge_received', {
+      from_user_id: challenger.id,
+      from_username: challenger.username,
+      from_rating: 1000, // will be enriched by gateway
+    });
+    if (!sent) return false;
+
+    // Auto-expire after 30 seconds
+    const timer = setTimeout(() => {
+      this.pendingChallenges.delete(targetUserId);
+      challengerSocket.emit('match:challenge_declined', { target_user_id: targetUserId });
+    }, 30_000);
+
+    this.pendingChallenges.set(targetUserId, { socket: challengerSocket, user: challenger, timer });
+    return true;
+  }
+
+  /** Respond to a 1v1 challenge. */
+  async respondPlayerChallenge(
+    responderSocket: Socket,
+    responder: { id: string; username: string },
+    fromUserId: string,
+    accept: boolean,
+  ): Promise<GameRoom | null> {
+    const challenge = this.pendingChallenges.get(responder.id);
+    if (!challenge || challenge.user.id !== fromUserId) return null;
+
+    clearTimeout(challenge.timer);
+    this.pendingChallenges.delete(responder.id);
+
+    if (!accept) {
+      challenge.socket.emit('match:challenge_declined', { target_user_id: responder.id });
+      return null;
+    }
+
+    // Create an unranked quick room
+    return this.joinPrivateRoom_internal(
+      challenge.socket, challenge.user,
+      responderSocket, responder,
+    );
+  }
+
+  /** Helper: create a private room given two sockets/users directly. */
+  private async joinPrivateRoom_internal(
+    socketA: Socket, userA: { id: string; username: string },
+    socketB: Socket, userB: { id: string; username: string },
+  ): Promise<GameRoom> {
+    const [dbA, dbB] = await Promise.all([
+      this.userRepo.findOneBy({ id: userA.id }),
+      this.userRepo.findOneBy({ id: userB.id }),
+    ]);
+    const questions = await this.questionsService.getRandomSet(ROUNDS);
+
+    const roomId = `duel_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const roomQuestions: RoomQuestion[] = questions.map((q) => ({
+      id: q.id,
+      categoryId: q.category_id,
+      categoryName: q.category?.name || '',
+      text: q.text,
+      words: q.text.split(' '),
+      options: q.options,
+      correctIndex: q.correct_option_index,
+      bonusText: q.bonus_text,
+      bonusOptions: q.bonus_options,
+    }));
+
+    const room: GameRoom = {
+      id: roomId,
+      type: 'quick',
+      ranked: false,
+      playerA: {
+        userId: userA.id,
+        username: userA.username,
+        rating: dbA?.rating || 1000,
+        universityId: dbA?.university_id || null,
+        socket: socketA,
+        score: 0,
+        side: 'a',
+        connected: true,
+        disconnectedAt: null,
+        rtt: 0,
+      },
+      playerB: {
+        userId: userB.id,
+        username: userB.username,
+        rating: dbB?.rating || 1000,
+        universityId: dbB?.university_id || null,
+        socket: socketB,
+        score: 0,
+        side: 'b',
+        connected: true,
+        disconnectedAt: null,
+        rtt: 0,
+      },
+      questions: roomQuestions,
+      currentRound: 0,
+      phase: 'countdown',
+      epoch: 0,
+      buzzedSide: null,
+      buzzedEarly: false,
+      buzzOpenAt: null,
+      wordIndex: 0,
+      answeredCorrectly: null,
+      answeredOption: null,
+      createdAt: Date.now(),
+    };
+
+    this.rooms.set(roomId, room);
+    this.userRooms.set(userA.id, roomId);
+    this.userRooms.set(userB.id, roomId);
+    this.timers.set(roomId, new Map());
+
+    socketA.join(roomId);
+    socketB.join(roomId);
+
+    const opponentInfoForA = { id: userB.id, username: userB.username, rating: dbB?.rating || 1000 };
+    const opponentInfoForB = { id: userA.id, username: userA.username, rating: dbA?.rating || 1000 };
+    socketA.emit('match:found', { match_id: roomId, opponent: opponentInfoForA, you_side: 'a' });
+    socketB.emit('match:found', { match_id: roomId, opponent: opponentInfoForB, you_side: 'b' });
+
+    this.startCountdown(room);
+    return room;
+  }
+
+  /** Cancel outgoing player challenge from this user. */
+  cancelPlayerChallenge(userId: string) {
+    for (const [targetId, challenge] of this.pendingChallenges) {
+      if (challenge.user.id === userId) {
+        clearTimeout(challenge.timer);
+        this.pendingChallenges.delete(targetId);
+        // Notify the target that the challenge was cancelled
+        break;
+      }
+    }
+  }
+
+  /** Clean up pending challenges on disconnect. */
+  cleanupPlayerChallenges(userId: string) {
+    this.cancelPlayerChallenge(userId);
+    // Also decline any challenges sent TO this user
+    const incoming = this.pendingChallenges.get(userId);
+    if (incoming) {
+      clearTimeout(incoming.timer);
+      incoming.socket.emit('match:challenge_declined', { target_user_id: userId });
+      this.pendingChallenges.delete(userId);
+    }
   }
 
   async createTeamRoom(lobbyA: TeamLobby, lobbyB: TeamLobby): Promise<GameRoom> {

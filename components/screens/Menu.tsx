@@ -18,9 +18,10 @@ interface Props {
   onLeaderboard: () => void;
   onTeams: () => void;
   onChallenges: () => void;
+  onFriendly: () => void;
 }
 
-export function Menu({ active, save, you, authStatus, username, onPlay, onDaily, onStats, onSignIn, onQuickMatch, onLeaderboard, onTeams, onChallenges }: Props) {
+export function Menu({ active, save, you, authStatus, username, onPlay, onDaily, onStats, onSignIn, onQuickMatch, onLeaderboard, onTeams, onChallenges, onFriendly }: Props) {
   const done = !!save.daily && save.daily.date === today();
   const streak = liveStreak(save);
   const authed = authStatus === 'authenticated';
@@ -65,6 +66,12 @@ export function Menu({ active, save, you, authStatus, username, onPlay, onDaily,
           <button className="tile" id="m-challenges" type="button" onClick={onChallenges}>
             <b>Challenges</b>
             <span>Challenge another university to a match.</span>
+          </button>
+        )}
+        {authed && (
+          <button className="tile" id="m-friendly" type="button" onClick={onFriendly}>
+            <b>Friendly match</b>
+            <span>Play a friend via a private code.</span>
           </button>
         )}
       </nav>
