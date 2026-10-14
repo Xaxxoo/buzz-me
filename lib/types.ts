@@ -44,6 +44,44 @@ export interface LobbyState {
   members: LobbyMemberState[];
 }
 
+export interface NotificationData {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  data: Record<string, any>;
+  read: boolean;
+  created_at: string;
+}
+
+export interface ChallengeData {
+  id: string;
+  host_university_id: string;
+  guest_university_id: string | null;
+  created_by: string;
+  start_at: string | null;
+  categories: string[];
+  question_count: number;
+  team_size: number;
+  status: string;
+  share_code: string;
+  created_at: string;
+  host_university?: { id: string; name: string; short_name: string; color_a: string; color_b: string; pattern: string };
+  guest_university?: { id: string; name: string; short_name: string; color_a: string; color_b: string; pattern: string } | null;
+  creator?: { id: string; username: string };
+}
+
+export interface ChallengeLobbyState {
+  challengeId: string;
+  hostUniName: string;
+  guestUniName: string;
+  teamSize: number;
+  hostPlayers: { userId: string; username: string; rating: number; ready: boolean }[];
+  guestPlayers: { userId: string; username: string; rating: number; ready: boolean }[];
+  hostReady: boolean;
+  guestReady: boolean;
+}
+
 /** A question and its options. The first option is always the right one. */
 export interface QA {
   t: string;

@@ -75,6 +75,28 @@ export class SocketClient {
     this.socket?.emit('team:challenge', { team_id: teamId, opponent_code: opponentCode });
   }
 
+  /* ---------- challenge client→server ---------- */
+  joinChallengeLobby(challengeId: string) {
+    this.socket?.emit('challenge:join_lobby', { challenge_id: challengeId });
+  }
+  leaveChallengeLobby(challengeId: string) {
+    this.socket?.emit('challenge:leave_lobby', { challenge_id: challengeId });
+  }
+  challengeReady(challengeId: string, ready: boolean) {
+    this.socket?.emit('challenge:ready', { challenge_id: challengeId, ready });
+  }
+  challengeStart(challengeId: string) {
+    this.socket?.emit('challenge:start', { challenge_id: challengeId });
+  }
+
+  /* ---------- spectate client→server ---------- */
+  joinSpectate(matchId: string) {
+    this.socket?.emit('spectate:join', { match_id: matchId });
+  }
+  leaveSpectate(matchId: string) {
+    this.socket?.emit('spectate:leave', { match_id: matchId });
+  }
+
   /* ---------- server→client ---------- */
   private bindEvents() {
     const s = this.socket;
@@ -104,6 +126,17 @@ export class SocketClient {
     s.on('team:finding', () => this.engine.onTeamFinding());
     s.on('team:match_found', d => this.engine.onTeamMatchFound(d));
     s.on('team:match_timeout', () => this.engine.onTeamMatchTimeout());
+
+    // Notification events
+    s.on('notification:new', d => this.engine.onNotification(d));
+
+    // Challenge events
+    s.on('challenge:lobby_update', d => this.engine.onChallengeLobbyUpdate(d));
+    s.on('challenge:starting', d => this.engine.onChallengeStarting(d));
+    s.on('challenge:live', d => this.engine.onChallengeLive(d));
+
+    // Spectate events
+    s.on('spectate:state', d => this.engine.onSpectateState(d));
 
     s.on('connect_error', async () => {
       // Try refreshing the token

@@ -8,7 +8,7 @@ import {
 } from './save';
 import { pickRival, school } from './schools';
 import { setMuted, sfx } from './sfx';
-import type { QA, Question, School, Team, TeamData, LobbyState } from './types';
+import type { QA, Question, School, Team, TeamData, LobbyState, NotificationData, ChallengeData, ChallengeLobbyState } from './types';
 
 /*
  * The game engine. It owns every timer and all match state, and publishes an immutable
@@ -19,7 +19,7 @@ import type { QA, Question, School, Team, TeamData, LobbyState } from './types';
  * from a room server and keep the rest.
  */
 
-export type Screen = 's-title' | 's-pick' | 's-vs' | 's-match' | 's-result' | 's-stats' | 's-login' | 's-signup' | 's-leaderboard' | 's-team';
+export type Screen = 's-title' | 's-pick' | 's-vs' | 's-match' | 's-result' | 's-stats' | 's-login' | 's-signup' | 's-leaderboard' | 's-team' | 's-challenges';
 export type Took = 'you' | 'rival' | 'none';
 
 export interface WordView { text: string; late: boolean; delay?: number }
@@ -92,6 +92,17 @@ export interface GameState {
   activeTeam: TeamData | null;
   lobby: LobbyState | null;
   teamFinding: boolean;
+  /* notifications */
+  notifications: NotificationData[];
+  unreadCount: number;
+  /* challenges */
+  challengeView: 'board' | 'create' | 'detail' | 'lobby';
+  challenges: ChallengeData[];
+  activeChallenge: ChallengeData | null;
+  challengeLobby: ChallengeLobbyState | null;
+  /* spectating */
+  spectating: boolean;
+  spectateMatchId: string | null;
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -116,6 +127,9 @@ const initial = (): GameState => ({
   selectedCategories: [], difficulty: 'medium',
   matchMode: 'local', matchId: null, finding: false, findElapsed: 0, opponentName: null,
   teamView: 'list', myTeams: [], activeTeam: null, lobby: null, teamFinding: false,
+  notifications: [], unreadCount: 0,
+  challengeView: 'board', challenges: [], activeChallenge: null, challengeLobby: null,
+  spectating: false, spectateMatchId: null,
 });
 
 export class GameEngine {
@@ -565,6 +579,56 @@ export class GameEngine {
 
   onTeamMatchTimeout() {
     this.set({ teamFinding: false });
+  }
+
+  /* ---------- notifications ---------- */
+  onNotification(data: { id: string; type: string; title: string; body: string; data: Record<string, any>; created_at: string }) {
+    const notif: NotificationData = { ...data, read: false };
+    this.set({
+      notifications: [notif, ...this.state.notifications].slice(0, 50),
+      unreadCount: this.state.unreadCount + 1,
+    });
+  }
+  setNotifications(items: NotificationData[]) {
+    this.set({ notifications: items, unreadCount: items.filter(n => !n.read).length });
+  }
+  markNotificationsRead() {
+    this.set({
+      notifications: this.state.notifications.map(n => ({ ...n, read: true })),
+      unreadCount: 0,
+    });
+  }
+
+  /* ---------- challenges navigation ---------- */
+  showChallenges() { sfx.tap(); this.set({ screen: 's-challenges', challengeView: 'board' }); }
+  showCreateChallenge() { sfx.tap(); this.set({ challengeView: 'create' }); }
+  showChallengeDetail(challenge: ChallengeData) { sfx.tap(); this.set({ challengeView: 'detail', activeChallenge: challenge }); }
+  showChallengeLobby(challenge: ChallengeData) { sfx.tap(); this.set({ challengeView: 'lobby', activeChallenge: challenge, challengeLobby: null }); }
+  backToChallengeBoard() { sfx.tap(); this.set({ challengeView: 'board', activeChallenge: null, challengeLobby: null }); }
+  setChallenges(list: ChallengeData[]) { this.set({ challenges: list }); }
+
+  /* ---------- challenge lobby event handlers ---------- */
+  onChallengeLobbyUpdate(data: ChallengeLobbyState) {
+    this.set({ challengeLobby: data });
+  }
+  onChallengeStarting(data: { challenge_id: string; countdown: number }) {
+    this.status(`Challenge starting in ${data.countdown}\u2026`);
+  }
+  onChallengeLive(data: { challenge_id: string; match_id: string }) {
+    // Transition handled by match:found
+    this.set({ challengeView: 'board', activeChallenge: null, challengeLobby: null });
+  }
+
+  /* ---------- spectator ---------- */
+  startSpectating(matchId: string) {
+    this.set({ spectating: true, spectateMatchId: matchId, screen: 's-match', matchMode: 'online' });
+  }
+  stopSpectating() {
+    this.set({ spectating: false, spectateMatchId: null });
+    this.menu();
+  }
+  onSpectateState(data: { match_id: string; score_a: number; score_b: number; round: number; total: number }) {
+    this.set({ scoreYou: data.score_a, scoreRival: data.score_b, qi: data.round - 1, total: data.total });
   }
 
   /* ---------- online event handlers ---------- */
