@@ -43,6 +43,16 @@ export class UsersService {
 
     if (dto.username) {
       this.profanity.transform(dto.username);
+
+      // 30-day cooldown
+      if (user.last_username_change) {
+        const daysSince = (Date.now() - user.last_username_change.getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSince < 30) {
+          const daysLeft = Math.ceil(30 - daysSince);
+          throw new BadRequestException(`You can change your username again in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`);
+        }
+      }
+
       const existing = await this.usersRepo.findOneBy({
         username_lower: dto.username.toLowerCase(),
       });
@@ -51,6 +61,7 @@ export class UsersService {
       }
       user.username = dto.username;
       user.username_lower = dto.username.toLowerCase();
+      user.last_username_change = new Date();
     }
 
     await this.usersRepo.save(user);
@@ -98,15 +109,33 @@ export class UsersService {
     return saveData;
   }
 
+  /** Returns [start, end] for the current calendar quarter. */
+  private static currentSeason(): [Date, Date] {
+    const now = new Date();
+    const quarter = Math.floor(now.getMonth() / 3);
+    const start = new Date(now.getFullYear(), quarter * 3, 1);
+    const end = new Date(now.getFullYear(), quarter * 3 + 3, 1);
+    return [start, end];
+  }
+
   async linkUniversity(userId: string, universityId: string) {
     const user = await this.usersRepo.findOneBy({ id: userId });
     if (!user) throw new NotFoundException('User not found');
+
+    // Once-per-season limit (skip if setting for the first time)
+    if (user.university_id && user.last_university_change) {
+      const [seasonStart] = UsersService.currentSeason();
+      if (user.last_university_change >= seasonStart) {
+        throw new BadRequestException('You can only change your university once per season');
+      }
+    }
 
     const university = await this.universityRepo.findOneBy({ id: universityId });
     if (!university) throw new NotFoundException('University not found');
 
     user.university_id = universityId;
-    user.university_verified = false; // Verification handled separately
+    user.university_verified = false;
+    user.last_university_change = new Date();
     await this.usersRepo.save(user);
 
     return { university_id: universityId, university_verified: false };

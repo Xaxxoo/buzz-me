@@ -64,6 +64,12 @@ export class User {
   @OneToMany(() => DeviceSession, (s) => s.user)
   sessions: DeviceSession[];
 
+  @Column({ type: 'timestamptz', nullable: true })
+  last_username_change: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  last_university_change: Date | null;
+
   @CreateDateColumn()
   created_at: Date;
 
