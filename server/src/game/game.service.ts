@@ -7,6 +7,7 @@ import {
 } from './types/game-room';
 import type { TeamLobby } from './types/team-lobby';
 import { ScoringService } from './scoring.service';
+import { UniversityPointsService } from './university-points.service';
 import { QuestionsService } from '../questions/questions.service';
 import { User } from '../entities/user.entity';
 import { Match } from '../entities/match.entity';
@@ -24,9 +25,11 @@ export class GameService {
   private rooms = new Map<string, GameRoom>();
   private userRooms = new Map<string, string>(); // userId -> roomId
   private timers = new Map<string, Map<number, NodeJS.Timeout>>(); // roomId -> epoch -> timer
+  private spectators = new Map<string, Set<import('socket.io').Socket>>(); // roomId -> spectator sockets
 
   constructor(
     private scoring: ScoringService,
+    private universityPoints: UniversityPointsService,
     private questionsService: QuestionsService,
     @InjectRepository(User) private userRepo: Repository<User>,
     @InjectRepository(Match) private matchRepo: Repository<Match>,
@@ -314,6 +317,146 @@ export class GameService {
     return room;
   }
 
+  async createChallengeRoom(
+    challengeId: string,
+    hostPlayers: { userId: string; username: string; rating: number; universityId: string | null; socket: Socket | null }[],
+    guestPlayers: { userId: string; username: string; rating: number; universityId: string | null; socket: Socket | null }[],
+    hostUniId: string,
+    guestUniId: string,
+    hostUniName: string,
+    guestUniName: string,
+    questionCount: number,
+  ): Promise<GameRoom> {
+    const allIds = [...hostPlayers, ...guestPlayers].map(p => p.userId);
+    const dbUsers = await Promise.all(allIds.map(id => this.userRepo.findOneBy({ id })));
+    const userMap = new Map(dbUsers.filter(Boolean).map(u => [u!.id, u!]));
+
+    const questions = await this.questionsService.getRandomSet(questionCount);
+    const roomId = `challenge_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const roomQuestions: RoomQuestion[] = questions.map(q => ({
+      id: q.id,
+      categoryId: q.category_id,
+      categoryName: q.category?.name || '',
+      text: q.text,
+      words: q.text.split(' '),
+      options: q.options,
+      correctIndex: q.correct_option_index,
+      bonusText: q.bonus_text,
+      bonusOptions: q.bonus_options,
+    }));
+
+    const buildTeamSlot = (players: typeof hostPlayers, uniId: string, side: 'a' | 'b'): TeamSlot => ({
+      teamId: `challenge_${side}_${challengeId}`,
+      teamName: side === 'a' ? hostUniName : guestUniName,
+      universityId: uniId,
+      score: 0,
+      side,
+      players: players.filter(p => p.socket).map(p => {
+        const db = userMap.get(p.userId);
+        return {
+          userId: p.userId,
+          username: p.username,
+          rating: db?.rating || p.rating,
+          universityId: p.universityId,
+          socket: p.socket,
+          score: 0,
+          side,
+          connected: true,
+          disconnectedAt: null,
+          rtt: 0,
+        };
+      }),
+    });
+
+    const teamSlotA = buildTeamSlot(hostPlayers, hostUniId, 'a');
+    const teamSlotB = buildTeamSlot(guestPlayers, guestUniId, 'b');
+
+    const room: GameRoom = {
+      id: roomId,
+      type: 'challenge',
+      ranked: true,
+      challengeId,
+      playerA: teamSlotA,
+      playerB: teamSlotB,
+      questions: roomQuestions,
+      currentRound: 0,
+      phase: 'countdown',
+      epoch: 0,
+      buzzedSide: null,
+      buzzedEarly: false,
+      wordIndex: 0,
+      answeredCorrectly: null,
+      answeredOption: null,
+      createdAt: Date.now(),
+    };
+
+    this.rooms.set(roomId, room);
+    this.timers.set(roomId, new Map());
+
+    for (const p of teamSlotA.players) {
+      this.userRooms.set(p.userId, roomId);
+      p.socket?.join(roomId);
+    }
+    for (const p of teamSlotB.players) {
+      this.userRooms.set(p.userId, roomId);
+      p.socket?.join(roomId);
+    }
+
+    const avgA = teamSlotA.players.reduce((s, p) => s + p.rating, 0) / (teamSlotA.players.length || 1);
+    const avgB = teamSlotB.players.reduce((s, p) => s + p.rating, 0) / (teamSlotB.players.length || 1);
+
+    for (const p of teamSlotA.players) {
+      p.socket?.emit('match:found', {
+        match_id: roomId,
+        opponent: { id: guestUniId, username: guestUniName, rating: Math.round(avgB) },
+        you_side: 'a',
+      });
+    }
+    for (const p of teamSlotB.players) {
+      p.socket?.emit('match:found', {
+        match_id: roomId,
+        opponent: { id: hostUniId, username: hostUniName, rating: Math.round(avgA) },
+        you_side: 'b',
+      });
+    }
+
+    this.startCountdown(room);
+    return room;
+  }
+
+  // ---------- Spectator support ----------
+
+  addSpectator(roomId: string, socket: Socket): boolean {
+    const room = this.rooms.get(roomId);
+    if (!room) return false;
+
+    let set = this.spectators.get(roomId);
+    if (!set) { set = new Set(); this.spectators.set(roomId, set); }
+    set.add(socket);
+    socket.join(`${roomId}_spec`);
+
+    // Send current snapshot
+    socket.emit('spectate:state', {
+      match_id: roomId,
+      score_a: room.playerA.score,
+      score_b: room.playerB.score,
+      round: room.currentRound + 1,
+      total: room.questions.length,
+      phase: room.phase,
+    });
+    return true;
+  }
+
+  removeSpectator(roomId: string, socket: Socket) {
+    const set = this.spectators.get(roomId);
+    if (set) {
+      set.delete(socket);
+      if (set.size === 0) this.spectators.delete(roomId);
+    }
+    socket.leave(`${roomId}_spec`);
+  }
+
   // ---------- Game loop ----------
 
   private scheduleTimer(room: GameRoom, fn: () => void, ms: number) {
@@ -341,6 +484,14 @@ export class GameService {
     };
     emitSlot(room.playerA);
     emitSlot(room.playerB);
+
+    // Relay to spectators (exclude answer options to prevent cheating)
+    const specSet = this.spectators.get(room.id);
+    if (specSet && specSet.size > 0 && event !== 'match:ask' && event !== 'match:rebound') {
+      for (const s of specSet) {
+        if (s.connected) s.emit(event, data);
+      }
+    }
   }
 
   private emitToSide(room: GameRoom, side: 'a' | 'b', event: string, data: any) {
@@ -739,6 +890,22 @@ export class GameService {
       this.emitToSide(room, 'b', 'match:end', endDataB);
     }
 
+    // Award university points for ranked non-solo matches
+    if (room.ranked && room.type !== 'solo') {
+      const pA = room.playerA as PlayerSlot;
+      const dbA = await this.userRepo.findOneBy({ id: pA.userId });
+      if (dbA) {
+        await this.universityPoints.awardMatchPoints(pA.userId, dbA.university_id, dbA.university_verified, scoreA > scoreB);
+      }
+      if (!isBot(room.playerB)) {
+        const pB = room.playerB as PlayerSlot;
+        const dbB = await this.userRepo.findOneBy({ id: pB.userId });
+        if (dbB) {
+          await this.universityPoints.awardMatchPoints(pB.userId, dbB.university_id, dbB.university_verified, scoreB > scoreA);
+        }
+      }
+    }
+
     // Persist match to DB
     await this.persistMatch(room);
 
@@ -803,6 +970,24 @@ export class GameService {
         rounds_won: 0,
         total_rounds: room.questions.length,
       });
+    }
+
+    // Award university points for each team member
+    if (room.ranked) {
+      for (const p of teamA.players) {
+        const db = await this.userRepo.findOneBy({ id: p.userId });
+        if (db) await this.universityPoints.awardMatchPoints(p.userId, db.university_id, db.university_verified, scoreA > scoreB);
+      }
+      for (const p of teamB.players) {
+        const db = await this.userRepo.findOneBy({ id: p.userId });
+        if (db) await this.universityPoints.awardMatchPoints(p.userId, db.university_id, db.university_verified, scoreB > scoreA);
+      }
+    }
+
+    // Award challenge points if this is a challenge match
+    if (room.type === 'challenge' && teamA.universityId && teamB.universityId) {
+      await this.universityPoints.awardChallengePoints(teamA.universityId, scoreA > scoreB);
+      await this.universityPoints.awardChallengePoints(teamB.universityId, scoreB > scoreA);
     }
 
     await this.persistMatch(room);
@@ -894,6 +1079,7 @@ export class GameService {
     cleanSlot(room.playerB);
     this.timers.delete(room.id);
     this.rooms.delete(room.id);
+    this.spectators.delete(room.id);
   }
 
   // ---------- Bot logic ----------
