@@ -66,6 +66,7 @@ export interface GameRoom {
   epoch: number; // bumped on phase change to cancel stale timers
   buzzedSide: 'a' | 'b' | null;
   buzzedEarly: boolean;
+  buzzOpenAt: number | null; // timestamp when buzz window opened, for speed bonus calc
   wordIndex: number;
   answeredCorrectly: boolean | null;
   answeredOption: string | null;

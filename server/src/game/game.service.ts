@@ -114,6 +114,7 @@ export class GameService {
       epoch: 0,
       buzzedSide: null,
       buzzedEarly: false,
+      buzzOpenAt: null,
       wordIndex: 0,
       answeredCorrectly: null,
       answeredOption: null,
@@ -187,6 +188,7 @@ export class GameService {
       epoch: 0,
       buzzedSide: null,
       buzzedEarly: false,
+      buzzOpenAt: null,
       wordIndex: 0,
       answeredCorrectly: null,
       answeredOption: null,
@@ -274,6 +276,7 @@ export class GameService {
       epoch: 0,
       buzzedSide: null,
       buzzedEarly: false,
+      buzzOpenAt: null,
       wordIndex: 0,
       answeredCorrectly: null,
       answeredOption: null,
@@ -385,6 +388,7 @@ export class GameService {
       epoch: 0,
       buzzedSide: null,
       buzzedEarly: false,
+      buzzOpenAt: null,
       wordIndex: 0,
       answeredCorrectly: null,
       answeredOption: null,
@@ -522,6 +526,7 @@ export class GameService {
     room.phase = 'reading';
     room.buzzedSide = null;
     room.buzzedEarly = false;
+    room.buzzOpenAt = null;
     room.wordIndex = 0;
     room.answeredCorrectly = null;
     room.answeredOption = null;
@@ -573,6 +578,7 @@ export class GameService {
 
   private openBuzzWindow(room: GameRoom) {
     room.phase = 'buzz_open';
+    room.buzzOpenAt = Date.now();
     this.emitToRoom(room, 'match:buzz_open', { duration_ms: BUZZ_WINDOW_MS });
 
     // Bot late buzz
@@ -648,7 +654,8 @@ export class GameService {
     room.answeredCorrectly = isCorrect;
 
     if (isCorrect) {
-      const pts = this.scoring.tossUpPoints(room.buzzedEarly);
+      const buzzFastMs = room.buzzOpenAt ? Date.now() - room.buzzOpenAt : null;
+      const pts = this.scoring.tossUpPoints(room.buzzedEarly, buzzFastMs);
       if (side === 'a') room.playerA.score += pts;
       else room.playerB.score += pts;
 
@@ -821,32 +828,62 @@ export class GameService {
   }
 
   private async finishMatch(room: GameRoom) {
-    room.phase = 'finished';
-    this.bumpEpoch(room);
-
     const scoreA = room.playerA.score;
     const scoreB = room.playerB.score;
+
+    // Sudden-death tiebreaker for non-solo matches (one extra question)
+    if (scoreA === scoreB && room.type !== 'solo' && !(room as any)._suddenDeath) {
+      (room as any)._suddenDeath = true;
+      this.emitToRoom(room, 'match:sudden_death', {});
+      try {
+        const extra = await this.questionsService.getRandomSet(1);
+        if (extra.length > 0) {
+          const q = extra[0];
+          room.questions.push({
+            id: q.id,
+            categoryId: q.category_id,
+            categoryName: q.category?.name || '',
+            text: q.text,
+            words: q.text.split(' '),
+            options: q.options,
+            correctIndex: q.correct_option_index,
+            bonusText: q.bonus_text,
+            bonusOptions: q.bonus_options,
+          });
+          // Continue with the extra round
+          this.scheduleTimer(room, () => this.nextRound(room), 2500);
+          return;
+        }
+      } catch {
+        this.logger.warn('Failed to fetch sudden-death question, proceeding with draw');
+      }
+    }
+
+    room.phase = 'finished';
+    this.bumpEpoch(room);
 
     if (room.type === 'team' && isTeam(room.playerA) && isTeam(room.playerB)) {
       return this.finishTeamMatch(room, room.playerA, room.playerB);
     }
 
     const playerA = room.playerA as PlayerSlot;
+    const isRanked = room.type !== 'solo';
 
-    // Calculate Elo
+    // Calculate Elo (solo matches do NOT change rating per C3)
     const opponentRating = isBot(room.playerB) ? 1000 : (room.playerB as PlayerSlot).rating;
     const resultA = this.scoring.matchResult(scoreA, scoreB);
-    const deltaA = this.scoring.eloChange(playerA.rating, opponentRating, resultA);
+    const deltaA = isRanked ? this.scoring.eloChange(playerA.rating, opponentRating, resultA) : 0;
     const newRatingA = playerA.rating + deltaA;
 
-    // Update player A rating in DB
-    await this.userRepo.update(playerA.userId, {
-      rating: newRatingA,
+    // Update player A in DB
+    const updateA: any = {
       matches_played: () => 'matches_played + 1',
       matches_won: () => resultA === 1 ? 'matches_won + 1' : 'matches_won',
       matches_lost: () => resultA === 0 ? 'matches_lost + 1' : 'matches_lost',
       matches_drawn: () => resultA === 0.5 ? 'matches_drawn + 1' : 'matches_drawn',
-    } as any);
+    };
+    if (isRanked) updateA.rating = newRatingA;
+    await this.userRepo.update(playerA.userId, updateA);
 
     const endDataA = {
       match_id: room.id,
@@ -865,16 +902,17 @@ export class GameService {
     if (!isBot(room.playerB)) {
       const playerB = room.playerB as PlayerSlot;
       const resultB = this.scoring.matchResult(scoreB, scoreA);
-      const deltaB = this.scoring.eloChange(playerB.rating, playerA.rating, resultB);
+      const deltaB = isRanked ? this.scoring.eloChange(playerB.rating, playerA.rating, resultB) : 0;
       const newRatingB = playerB.rating + deltaB;
 
-      await this.userRepo.update(playerB.userId, {
-        rating: newRatingB,
+      const updateB: any = {
         matches_played: () => 'matches_played + 1',
         matches_won: () => resultB === 1 ? 'matches_won + 1' : 'matches_won',
         matches_lost: () => resultB === 0 ? 'matches_lost + 1' : 'matches_lost',
         matches_drawn: () => resultB === 0.5 ? 'matches_drawn + 1' : 'matches_drawn',
-      } as any);
+      };
+      if (isRanked) updateB.rating = newRatingB;
+      await this.userRepo.update(playerB.userId, updateB);
 
       const endDataB = {
         match_id: room.id,
@@ -1122,7 +1160,8 @@ export class GameService {
       // Bot answers: 74% correct (matches frontend)
       const correct = Math.random() < 0.74;
       if (correct) {
-        const pts = this.scoring.tossUpPoints(room.buzzedEarly);
+        const buzzFastMs = room.buzzOpenAt ? Date.now() - room.buzzOpenAt : null;
+        const pts = this.scoring.tossUpPoints(room.buzzedEarly, buzzFastMs);
         room.playerB.score += pts;
         const q = room.questions[room.currentRound];
 

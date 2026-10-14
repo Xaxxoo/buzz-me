@@ -3,9 +3,11 @@ import { ELO_K_FACTOR } from '../config/game.config';
 
 @Injectable()
 export class ScoringService {
-  /** Points for a correct toss-up answer. */
-  tossUpPoints(early: boolean): number {
-    return early ? 15 : 10;
+  /** Points for a correct toss-up answer. +5 speed bonus if buzzed within 2s of unlock. */
+  tossUpPoints(buzzedBeforeUnlock: boolean, buzzFastMs: number | null): number {
+    if (buzzedBeforeUnlock) return 10; // no speed bonus for pre-unlock buzzes
+    const speedBonus = buzzFastMs !== null && buzzFastMs <= 2000 ? 5 : 0;
+    return 10 + speedBonus;
   }
 
   /** Penalty for a wrong early buzz. */
@@ -15,7 +17,7 @@ export class ScoringService {
 
   /** Points for a correct rebound/steal. */
   reboundPoints(): number {
-    return 10;
+    return 5;
   }
 
   /** Points for a correct bonus answer. */
