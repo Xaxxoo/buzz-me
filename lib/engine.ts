@@ -317,7 +317,12 @@ export class GameEngine {
   menu() { this.cut(); this.phase = 'idle'; sfx.tap(); this.set({ screen: 's-title', pending: null, you: this.keptSchool() }); }
   showStats() { sfx.tap(); this.set({ screen: 's-stats' }); }
   openPicker(pending: 'daily' | null = null) { this.set({ screen: 's-pick', pending, pickKey: this.state.pickKey + 1 }); }
-  play() { sfx.buzz(); this.openPicker(null); }
+  private requireAuth(): boolean {
+    if (this.auth?.getSnapshot().status === 'authenticated') return true;
+    this.set({ screen: 's-login' });
+    return false;
+  }
+  play() { sfx.buzz(); if (!this.requireAuth()) return; this.openPicker(null); }
   choose(s: School) { sfx.tap(); this.set({ you: s }); }
   /** The picker's main button. */
   go() {
@@ -329,7 +334,7 @@ export class GameEngine {
     if (this.state.pending === 'daily') { this.set({ pending: null }); this.startDaily(); } else this.startMatch();
   }
   rematch() { sfx.tap(); this.state.matchMode === 'online' ? this.findQuickMatch() : this.startMatch(); }
-  daily() { sfx.tap(); this.startDaily(); }
+  daily() { sfx.tap(); if (!this.requireAuth()) return; this.startDaily(); }
   showLogin() { sfx.tap(); this.set({ screen: 's-login' }); }
   showSignup() { sfx.tap(); this.set({ screen: 's-signup' }); }
   showLeaderboard() { sfx.tap(); this.set({ screen: 's-leaderboard' }); }
@@ -423,9 +428,6 @@ export class GameEngine {
   async startMatch() {
     const you = this.state.you;
     if (!you) return this.openPicker(null);
-    if (this.auth?.getSnapshot().status !== 'authenticated') {
-      return this.set({ screen: 's-login' });
-    }
     this.cut();
     this.set({ questionsLoading: true, questionsError: null });
     try {
@@ -453,9 +455,6 @@ export class GameEngine {
   async startDaily() {
     if (!this.state.you) return this.openPicker('daily');
     if (this.save.daily && this.save.daily.date === today()) return this.showDailyResult(false);
-    if (this.auth?.getSnapshot().status !== 'authenticated') {
-      return this.set({ screen: 's-login' });
-    }
     this.cut();
     this.set({ questionsLoading: true, questionsError: null });
     try {
