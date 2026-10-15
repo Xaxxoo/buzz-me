@@ -19,6 +19,12 @@ import {
   MIN_BUZZ_TIME_MS, RECONNECT_WINDOW_MS,
 } from '../config/game.config';
 
+/** Split text into words, collapsing whitespace and filtering empties. */
+function splitWords(text: string | null | undefined): string[] {
+  if (!text) return [];
+  return text.trim().replace(/\s+/g, ' ').split(' ').filter(w => w.length > 0);
+}
+
 @Injectable()
 export class GameService {
   private readonly logger = new Logger(GameService.name);
@@ -81,7 +87,7 @@ export class GameService {
       categoryId: q.category_id,
       categoryName: q.category?.name || '',
       text: q.text,
-      words: q.text.split(' '),
+      words: splitWords(q.text),
       options: q.options,
       correctIndex: q.correct_option_index,
       bonusText: q.bonus_text,
@@ -151,7 +157,7 @@ export class GameService {
       categoryId: q.category_id,
       categoryName: q.category?.name || '',
       text: q.text,
-      words: q.text.split(' '),
+      words: splitWords(q.text),
       options: q.options,
       correctIndex: q.correct_option_index,
       bonusText: q.bonus_text,
@@ -250,7 +256,7 @@ export class GameService {
       categoryId: q.category_id,
       categoryName: q.category?.name || '',
       text: q.text,
-      words: q.text.split(' '),
+      words: splitWords(q.text),
       options: q.options,
       correctIndex: q.correct_option_index,
       bonusText: q.bonus_text,
@@ -397,7 +403,7 @@ export class GameService {
       categoryId: q.category_id,
       categoryName: q.category?.name || '',
       text: q.text,
-      words: q.text.split(' '),
+      words: splitWords(q.text),
       options: q.options,
       correctIndex: q.correct_option_index,
       bonusText: q.bonus_text,
@@ -501,7 +507,7 @@ export class GameService {
       categoryId: q.category_id,
       categoryName: q.category?.name || '',
       text: q.text,
-      words: q.text.split(' '),
+      words: splitWords(q.text),
       options: q.options,
       correctIndex: q.correct_option_index,
       bonusText: q.bonus_text,
@@ -615,7 +621,7 @@ export class GameService {
       categoryId: q.category_id,
       categoryName: q.category?.name || '',
       text: q.text,
-      words: q.text.split(' '),
+      words: splitWords(q.text),
       options: q.options,
       correctIndex: q.correct_option_index,
       bonusText: q.bonus_text,
@@ -804,6 +810,13 @@ export class GameService {
     room.answeredCorrectly = null;
     room.answeredOption = null;
 
+    if (q.words.length === 0) {
+      this.logger.warn(`Question ${q.id} has no words, skipping round ${room.currentRound + 1}`);
+      room.currentRound++;
+      this.scheduleTimer(room, () => this.nextRound(room), 100);
+      return;
+    }
+
     this.emitToRoom(room, 'match:question', {
       round: room.currentRound + 1,
       total: room.questions.length,
@@ -819,8 +832,9 @@ export class GameService {
   }
 
   private readNextWord(room: GameRoom) {
+    if (room.phase !== 'reading') return;
     const q = room.questions[room.currentRound];
-    if (room.wordIndex >= q.words.length) {
+    if (!q || room.wordIndex >= q.words.length) {
       return this.openBuzzWindow(room);
     }
 
@@ -1031,18 +1045,20 @@ export class GameService {
   private startBonus(room: GameRoom, forSide: 'a' | 'b') {
     room.phase = 'bonus';
     const q = room.questions[room.currentRound];
-    if (!q.bonusText || !q.bonusOptions || q.bonusText.trim().split(/\s+/).length < 4 || q.bonusOptions.length < 2) {
+    const bonusWords = splitWords(q.bonusText);
+    if (bonusWords.length < 4 || !q.bonusOptions || q.bonusOptions.length < 2) {
       // No valid bonus question — skip to next round
       this.endRound(room, forSide);
       return;
     }
 
+    const cleanBonusText = bonusWords.join(' ');
     const shuffled = this.shuffleOptions(q.bonusOptions);
 
     if (isBot(room.playerB) && forSide === 'b') {
       // Bot bonus
       this.emitToRoom(room, 'match:bonus', {
-        text: q.bonusText,
+        text: cleanBonusText,
         options: shuffled,
         seconds: BONUS_WINDOW_S,
         for_side: forSide,
@@ -1052,7 +1068,7 @@ export class GameService {
     }
 
     this.emitToRoom(room, 'match:bonus', {
-      text: q.bonusText,
+      text: cleanBonusText,
       options: shuffled,
       seconds: BONUS_WINDOW_S,
       for_side: forSide,
@@ -1117,7 +1133,7 @@ export class GameService {
             categoryId: q.category_id,
             categoryName: q.category?.name || '',
             text: q.text,
-            words: q.text.split(' '),
+            words: splitWords(q.text),
             options: q.options,
             correctIndex: q.correct_option_index,
             bonusText: q.bonus_text,
