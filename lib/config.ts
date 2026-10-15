@@ -1,5 +1,5 @@
 /** Working title. Change it here and it changes everywhere. */
-export const GAME_NAME = 'Quad';
+export const GAME_NAME = 'Campus Trivia';
 
 /** Toss-ups in a match against a rival school. */
 export const ROUNDS = 8;
