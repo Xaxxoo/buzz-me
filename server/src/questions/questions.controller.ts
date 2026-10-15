@@ -10,6 +10,17 @@ import { CreateQuestionDto } from './dto/create-question.dto';
 export class QuestionsController {
   constructor(private readonly service: QuestionsService) {}
 
+  @Get('random')
+  @UseGuards(JwtAuthGuard)
+  getRandom(
+    @Query('count') count?: string,
+    @Query('categories') categories?: string,
+  ) {
+    const n = Math.min(Math.max(count ? parseInt(count, 10) || 8 : 8, 1), 50);
+    const slugs = categories ? categories.split(',').map(s => s.trim()).filter(Boolean) : [];
+    return this.service.getRandomSetByCategories(n, slugs);
+  }
+
   @Get('daily')
   @UseGuards(JwtAuthGuard)
   getDaily() {
