@@ -19,7 +19,7 @@ export class MatchParticipant {
   user: User;
 
   /** 'a' or 'b' for team side */
-  @Column({ length: 1, nullable: true })
+  @Column({ type: 'varchar', length: 1, nullable: true })
   team_side: string | null;
 
   @Column({ type: 'int', default: 0 })
