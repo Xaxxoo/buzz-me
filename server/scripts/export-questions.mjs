@@ -11,7 +11,10 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const categoriesDir = join(__dirname, '../../lib/data/categories');
+// Resolve from process.cwd() (the server/ directory) so this works both
+// locally and on Railway where the root directory is set to server/.
+const serverRoot = process.cwd();
+const categoriesDir = join(serverRoot, '../lib/data/categories');
 
 /** Maps filename (without .ts) to the display name used in-game. */
 const CATEGORY_MAP = {
