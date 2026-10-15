@@ -26,16 +26,23 @@ import { ReportsModule } from './reports/reports.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres' as const,
-        host: config.get<string>('database.host'),
-        port: config.get<number>('database.port'),
-        username: config.get<string>('database.username'),
-        password: config.get<string>('database.password'),
-        database: config.get<string>('database.database'),
-        autoLoadEntities: true,
-        synchronize: true, // disable in production
-      }),
+      useFactory: (config: ConfigService) => {
+        const url = config.get<string>('database.url');
+        return {
+          type: 'postgres' as const,
+          ...(url
+            ? { url, ssl: { rejectUnauthorized: false } }
+            : {
+                host: config.get<string>('database.host'),
+                port: config.get<number>('database.port'),
+                username: config.get<string>('database.username'),
+                password: config.get<string>('database.password'),
+                database: config.get<string>('database.database'),
+              }),
+          autoLoadEntities: true,
+          synchronize: true, // disable in production
+        };
+      },
     }),
     AuthModule,
     UsersModule,
