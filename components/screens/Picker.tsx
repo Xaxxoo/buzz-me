@@ -18,11 +18,14 @@ interface Props {
   difficulty: Difficulty;
   categories: DbCategory[];
   categoriesLoading: boolean;
+  questionsLoading: boolean;
+  questionsError: string | null;
   onSetCategories: (cats: string[]) => void;
   onSetDifficulty: (d: Difficulty) => void;
   onChoose: (s: School) => void;
   onGo: () => void;
   onMenu: () => void;
+  onDismissError: () => void;
 }
 
 const LEVELS: { id: Difficulty; label: string; note: string }[] = [
@@ -47,7 +50,7 @@ function Row({ s, sub, add, picked, onChoose }: { s: School; sub: string; add?: 
  * The daily has no setup, so it only shows the school step.
  * Game.tsx remounts this each time the picker opens, so search, country and step start fresh.
  */
-export function Picker({ active, you, forDaily, selectedCategories, difficulty, categories, categoriesLoading, onSetCategories, onSetDifficulty, onChoose, onGo, onMenu }: Props) {
+export function Picker({ active, you, forDaily, selectedCategories, difficulty, categories, categoriesLoading, questionsLoading, questionsError, onSetCategories, onSetDifficulty, onChoose, onGo, onMenu, onDismissError }: Props) {
   const [step, setStep] = useState<'school' | 'setup'>(() => (you && !forDaily ? 'setup' : 'school'));
   const [country, setCountry] = useState<string | null>(() => (you && UNIS[you.country] ? you.country : null));
   const [query, setQuery] = useState('');
@@ -164,7 +167,16 @@ export function Picker({ active, you, forDaily, selectedCategories, difficulty, 
           </div>
         </div>
 
-        <button className="btn go" id="go" type="button" disabled={tooFew} onClick={onGo}>Start match</button>
+        {questionsError && (
+          <p className="hint warn" role="alert">
+            {questionsError}{' '}
+            <button type="button" className="back" onClick={onDismissError}>Dismiss</button>
+          </p>
+        )}
+
+        <button className="btn go" id="go" type="button" disabled={tooFew || questionsLoading} onClick={onGo}>
+          {questionsLoading ? 'Loading…' : 'Start match'}
+        </button>
       </section>
     );
   }
@@ -197,8 +209,15 @@ export function Picker({ active, you, forDaily, selectedCategories, difficulty, 
       )}
       <div className={'list' + (!searching && !country ? ' countries' : '')} id="list" ref={list}>{rows}</div>
 
-      <button className="btn go" id="go" type="button" disabled={!you} onClick={next}>
-        {!you ? 'Choose a school' : forDaily ? `Start the daily for ${you.short}` : `Continue as ${you.short}`}
+      {questionsError && forDaily && (
+        <p className="hint warn" role="alert">
+          {questionsError}{' '}
+          <button type="button" className="back" onClick={onDismissError}>Dismiss</button>
+        </p>
+      )}
+
+      <button className="btn go" id="go" type="button" disabled={!you || (forDaily && questionsLoading)} onClick={next}>
+        {forDaily && questionsLoading ? 'Loading…' : !you ? 'Choose a school' : forDaily ? `Start the daily for ${you.short}` : `Continue as ${you.short}`}
       </button>
     </section>
   );

@@ -353,8 +353,10 @@ export default function Game() {
           key={s.pickKey} active={s.screen === 's-pick'} you={s.you} forDaily={s.pending === 'daily'}
           selectedCategories={s.selectedCategories} difficulty={s.difficulty}
           categories={dbCategories} categoriesLoading={categoriesLoading}
+          questionsLoading={s.questionsLoading} questionsError={s.questionsError}
           onSetCategories={cats => engine.setCategories(cats)} onSetDifficulty={d => engine.setDifficulty(d)}
           onChoose={sch => engine.choose(sch)} onGo={() => engine.go()} onMenu={() => engine.menu()}
+          onDismissError={() => engine.dismissQuestionsError()}
         />
         <Stats
           active={s.screen === 's-stats'} save={s.save} you={s.you} onMenu={() => engine.menu()}
