@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Question } from '../entities/question.entity';
@@ -40,12 +40,19 @@ export class QuestionsService {
     });
 
     const r = this.seeded(this.hash('quad ' + date));
-    const a = questions.slice();
+    const a = questions.filter((q) => this.isValid(q)).slice();
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(r() * (i + 1));
       [a[i], a[j]] = [a[j], a[i]];
     }
     return a.slice(0, DAILY_QUESTIONS);
+  }
+
+  /** A valid question needs non-empty text with at least 4 words and at least 2 options. */
+  private isValid(q: Question): boolean {
+    if (!q.text || q.text.trim().split(/\s+/).length < 4) return false;
+    if (!Array.isArray(q.options) || q.options.length < 2) return false;
+    return true;
   }
 
   /** Random set for matches. */
@@ -55,8 +62,11 @@ export class QuestionsService {
       relations: ['category'],
     });
 
+    // Filter out malformed questions
+    const valid = questions.filter((q) => this.isValid(q));
+
     // Fisher-Yates shuffle
-    const a = questions.slice();
+    const a = valid.slice();
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [a[i], a[j]] = [a[j], a[i]];
@@ -76,8 +86,11 @@ export class QuestionsService {
 
     const questions = await qb.getMany();
 
+    // Filter out malformed questions
+    const valid = questions.filter((q) => this.isValid(q));
+
     // Fisher-Yates shuffle
-    const a = questions.slice();
+    const a = valid.slice();
     for (let i = a.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [a[i], a[j]] = [a[j], a[i]];
@@ -109,7 +122,20 @@ export class QuestionsService {
     return q;
   }
 
+  private validateDto(dto: any) {
+    if (!dto.text || typeof dto.text !== 'string' || dto.text.trim().split(/\s+/).length < 4) {
+      throw new BadRequestException('Question text must contain at least 4 words');
+    }
+    if (!Array.isArray(dto.options) || dto.options.length < 2) {
+      throw new BadRequestException('Question must have at least 2 options');
+    }
+    if (dto.bonus_text && typeof dto.bonus_text === 'string' && dto.bonus_text.trim().split(/\s+/).length < 4) {
+      throw new BadRequestException('Bonus text must contain at least 4 words');
+    }
+  }
+
   async create(dto: any) {
+    this.validateDto(dto);
     const question = this.repo.create(dto);
     return this.repo.save(question);
   }

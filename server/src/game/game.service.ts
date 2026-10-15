@@ -1031,8 +1031,8 @@ export class GameService {
   private startBonus(room: GameRoom, forSide: 'a' | 'b') {
     room.phase = 'bonus';
     const q = room.questions[room.currentRound];
-    if (!q.bonusText || !q.bonusOptions) {
-      // No bonus question — skip to next round
+    if (!q.bonusText || !q.bonusOptions || q.bonusText.trim().split(/\s+/).length < 4 || q.bonusOptions.length < 2) {
+      // No valid bonus question — skip to next round
       this.endRound(room, forSide);
       return;
     }
