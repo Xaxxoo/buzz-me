@@ -302,6 +302,7 @@ export class GameEngine {
   toggleMute() { const muted = !this.state.muted; setMuted(muted); this.set({ muted }); sfx.tap(); }
   setCategories(cats: string[]) { this.set({ selectedCategories: cats }); }
   setDifficulty(d: 'easy' | 'medium' | 'hard') { this.set({ difficulty: d }); }
+  dismissQuestionsError() { this.set({ questionsError: null }); }
 
   private botParams() {
     const p = {
@@ -422,6 +423,9 @@ export class GameEngine {
   async startMatch() {
     const you = this.state.you;
     if (!you) return this.openPicker(null);
+    if (this.auth?.getSnapshot().status !== 'authenticated') {
+      return this.set({ screen: 's-login' });
+    }
     this.cut();
     this.set({ questionsLoading: true, questionsError: null });
     try {
@@ -431,7 +435,7 @@ export class GameEngine {
       if (catSlugs.length) params.set('categories', catSlugs.join(','));
       const raw = await this.auth!.api.get<DbQuestion[]>(`/questions/random?${params}`);
       this.qs = raw.map(mapQuestion);
-    } catch (err) {
+    } catch {
       this.set({ questionsLoading: false, questionsError: 'Failed to load questions. Check your connection and try again.' });
       return;
     }
@@ -449,12 +453,15 @@ export class GameEngine {
   async startDaily() {
     if (!this.state.you) return this.openPicker('daily');
     if (this.save.daily && this.save.daily.date === today()) return this.showDailyResult(false);
+    if (this.auth?.getSnapshot().status !== 'authenticated') {
+      return this.set({ screen: 's-login' });
+    }
     this.cut();
     this.set({ questionsLoading: true, questionsError: null });
     try {
       const raw = await this.auth!.api.get<DbQuestion[]>('/questions/daily');
       this.qs = raw.map(mapQuestion);
-    } catch (err) {
+    } catch {
       this.set({ questionsLoading: false, questionsError: 'Failed to load daily questions. Check your connection and try again.' });
       return;
     }
