@@ -37,6 +37,41 @@ export class UniversitiesService {
     return uni;
   }
 
+  async create(data: {
+    name: string;
+    short_name: string;
+    country: string;
+    email_domains?: string[];
+    color_a: string;
+    color_b: string;
+    pattern: string;
+  }) {
+    const uni = this.repo.create(data);
+    return this.repo.save(uni);
+  }
+
+  async update(id: string, data: Partial<{
+    name: string;
+    short_name: string;
+    country: string;
+    email_domains: string[];
+    color_a: string;
+    color_b: string;
+    pattern: string;
+    logo_url: string;
+  }>) {
+    const uni = await this.repo.findOneBy({ id });
+    if (!uni) throw new NotFoundException('University not found');
+    Object.assign(uni, data);
+    return this.repo.save(uni);
+  }
+
+  async remove(id: string) {
+    const uni = await this.repo.findOneBy({ id });
+    if (!uni) throw new NotFoundException('University not found');
+    await this.repo.remove(uni);
+  }
+
   /** University public profile with top players, recent challenges, and stats. */
   async getProfile(id: string) {
     const uni = await this.repo.findOneBy({ id });
