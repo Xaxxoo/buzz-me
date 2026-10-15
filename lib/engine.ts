@@ -1,9 +1,9 @@
 import type { AuthClient } from './auth';
+import { type DbQuestion, mapQuestion } from './api';
 import { DAILY, OPEN_MS, ROUNDS } from './config';
 import { confetti } from './confetti';
-import { QUESTIONS } from './data/questions';
 import {
-  bumpStreak, dailySet, defaultSave, isTutorialDone, liveStreak, loadSave, loadServerSave, markTutorialDone, nextIn, niceDate, record, syncSave, today, writeSave,
+  bumpStreak, defaultSave, isTutorialDone, liveStreak, loadSave, loadServerSave, markTutorialDone, nextIn, niceDate, record, syncSave, today, writeSave,
   type Mark, type Save,
 } from './save';
 import { pickRival, school } from './schools';
@@ -118,6 +118,9 @@ export interface GameState {
   /* connectivity */
   online: boolean;
   reconnecting: boolean;
+  /* question loading */
+  questionsLoading: boolean;
+  questionsError: string | null;
   /* tutorial */
   tutorialStep: number;
   tutorialTip: string;
@@ -161,6 +164,8 @@ const initial = (): GameState => ({
   universityProfile: null,
   online: true,
   reconnecting: false,
+  questionsLoading: false,
+  questionsError: null,
   tutorialStep: 0,
   tutorialTip: '',
 });
@@ -171,6 +176,8 @@ export class GameEngine {
   private epoch = 0;
   private keys = 0;
   auth: AuthClient | null = null;
+  /** Cached DB categories for name→slug mapping (populated by Game.tsx). */
+  dbCategories: { name: string; slug: string }[] = [];
 
   /* working state for the question in play; none of it is rendered directly */
   private save: Save = defaultSave();
@@ -412,14 +419,23 @@ export class GameEngine {
     });
   }
 
-  startMatch() {
+  async startMatch() {
     const you = this.state.you;
     if (!you) return this.openPicker(null);
     this.cut();
-    const pool = this.state.selectedCategories.length
-      ? QUESTIONS.filter(q => this.state.selectedCategories.includes(q.c))
-      : QUESTIONS;
-    this.qs = shuffle(pool).slice(0, ROUNDS);
+    this.set({ questionsLoading: true, questionsError: null });
+    try {
+      const cats = this.state.selectedCategories;
+      const catSlugs = cats.length ? this.catNamesToSlugs(cats) : [];
+      const params = new URLSearchParams({ count: String(ROUNDS) });
+      if (catSlugs.length) params.set('categories', catSlugs.join(','));
+      const raw = await this.auth!.api.get<DbQuestion[]>(`/questions/random?${params}`);
+      this.qs = raw.map(mapQuestion);
+    } catch (err) {
+      this.set({ questionsLoading: false, questionsError: 'Failed to load questions. Check your connection and try again.' });
+      return;
+    }
+    this.set({ questionsLoading: false });
     this.resetBoard('match', this.qs.length, pickRival(you));
     this.set({ screen: 's-vs' });
     sfx.slam(); setTimeout(() => sfx.slam(), 180);
@@ -430,15 +446,31 @@ export class GameEngine {
     }, calm() ? 1400 : 2600);
   }
 
-  startDaily() {
+  async startDaily() {
     if (!this.state.you) return this.openPicker('daily');
     if (this.save.daily && this.save.daily.date === today()) return this.showDailyResult(false);
     this.cut();
+    this.set({ questionsLoading: true, questionsError: null });
+    try {
+      const raw = await this.auth!.api.get<DbQuestion[]>('/questions/daily');
+      this.qs = raw.map(mapQuestion);
+    } catch (err) {
+      this.set({ questionsLoading: false, questionsError: 'Failed to load daily questions. Check your connection and try again.' });
+      return;
+    }
+    this.set({ questionsLoading: false });
     this.day = today();
-    this.qs = dailySet(this.day);
     this.resetBoard('daily', this.qs.length, null);
     this.set({ screen: 's-match', dayLabel: niceDate(this.day) });
     this.nextQuestion();
+  }
+
+  /** Map category display names to slugs using the dbCategories cache. */
+  private catNamesToSlugs(names: string[]): string[] {
+    if (!this.dbCategories.length) return [];
+    return names
+      .map(n => this.dbCategories.find(c => c.name === n)?.slug)
+      .filter((s): s is string => !!s);
   }
 
   private nextQuestion() {
