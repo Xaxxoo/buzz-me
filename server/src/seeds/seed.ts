@@ -160,73 +160,84 @@ async function seed() {
   const catRepo = ds.getRepository(Category);
   const qRepo = ds.getRepository(Question);
 
-  // 1. Seed categories
+  // 1. Seed categories (bulk)
   const catNames = [...new Set(QUESTIONS_DATA.map((q) => q.c))];
+  const existingCats = await catRepo.find();
+  const existingCatSlugs = new Set(existingCats.map((c) => c.slug));
   const categoryMap = new Map<string, Category>();
+  existingCats.forEach((c) => categoryMap.set(c.name, c));
 
-  for (const name of catNames) {
-    const slug = slugify(name);
-    let cat = await catRepo.findOneBy({ slug });
-    if (!cat) {
-      cat = catRepo.create({ name, slug, active: true });
-      await catRepo.save(cat);
-    }
-    categoryMap.set(name, cat);
+  const newCats = catNames
+    .filter((name) => !existingCatSlugs.has(slugify(name)))
+    .map((name) => catRepo.create({ name, slug: slugify(name), active: true }));
+
+  if (newCats.length > 0) {
+    const saved = await catRepo.save(newCats);
+    saved.forEach((c) => categoryMap.set(c.name, c));
   }
-  console.log(`Seeded ${categoryMap.size} categories`);
+  console.log(`Seeded ${newCats.length} new categories (${categoryMap.size} total)`);
 
-  // 2. Seed universities
-  let uniCount = 0;
+  // 2. Seed universities (bulk in batches of 100)
+  const existingUnis = await uniRepo.find({ select: ['name'] });
+  const existingUniNames = new Set(existingUnis.map((u) => u.name));
+
+  const allNewUnis: University[] = [];
   for (const [country, names] of Object.entries(UNIS)) {
     for (const name of names) {
-      const existing = await uniRepo.findOneBy({ name });
-      if (existing) continue;
-
+      if (existingUniNames.has(name)) continue;
       const look = schoolLook(name);
-      const uni = uniRepo.create({
-        name,
-        short_name: shortOf(name).slice(0, 10),
-        country,
-        color_a: look.a,
-        color_b: look.b,
-        pattern: look.pat,
-        email_domains: [],
-        points: 0,
-      });
-      await uniRepo.save(uni);
-      uniCount++;
+      allNewUnis.push(
+        uniRepo.create({
+          name,
+          short_name: shortOf(name).slice(0, 10),
+          country,
+          color_a: look.a,
+          color_b: look.b,
+          pattern: look.pat,
+          email_domains: [],
+          points: 0,
+        }),
+      );
     }
   }
-  console.log(`Seeded ${uniCount} universities`);
 
-  // 3. Seed questions (skip duplicates by matching question text)
-  let qCount = 0;
+  for (let i = 0; i < allNewUnis.length; i += 100) {
+    await uniRepo.save(allNewUnis.slice(i, i + 100));
+    console.log(`  Universities: ${Math.min(i + 100, allNewUnis.length)}/${allNewUnis.length}`);
+  }
+  console.log(`Seeded ${allNewUnis.length} universities`);
+
+  // 3. Seed questions (bulk in batches of 200, skip duplicates)
+  const existingQTexts = new Set(
+    (await qRepo.find({ select: ['text'] })).map((q) => q.text),
+  );
+
+  const allNewQs: Question[] = [];
   let skipped = 0;
   for (const qd of QUESTIONS_DATA) {
     const cat = categoryMap.get(qd.c);
     if (!cat) continue;
+    if (existingQTexts.has(qd.t)) { skipped++; continue; }
 
-    // Check for existing question with the same text to avoid duplicates
-    const existing = await qRepo.findOneBy({ text: qd.t });
-    if (existing) {
-      skipped++;
-      continue;
-    }
-
-    const q = qRepo.create({
-      category_id: cat.id,
-      text: qd.t,
-      options: qd.o,
-      correct_option_index: 0,
-      bonus_text: qd.b.t,
-      bonus_options: qd.b.o,
-      difficulty: 'medium',
-      active: true,
-    });
-    await qRepo.save(q);
-    qCount++;
+    allNewQs.push(
+      qRepo.create({
+        category_id: cat.id,
+        text: qd.t,
+        options: qd.o,
+        correct_option_index: 0,
+        bonus_text: qd.b.t,
+        bonus_options: qd.b.o,
+        difficulty: 'medium',
+        active: true,
+      }),
+    );
   }
-  console.log(`Seeded ${qCount} questions (${skipped} duplicates skipped)`);
+
+  for (let i = 0; i < allNewQs.length; i += 200) {
+    await qRepo.save(allNewQs.slice(i, i + 200));
+    console.log(`  Questions: ${Math.min(i + 200, allNewQs.length)}/${allNewQs.length}`);
+  }
+  console.log(`Seeded ${allNewQs.length} questions (${skipped} duplicates skipped)`);
 
   await ds.destroy();
   console.log('Seed complete.');
