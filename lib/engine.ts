@@ -494,7 +494,7 @@ export class GameEngine {
     const qi = this.state.qi;
     if (qi >= this.qs.length) return this.finish();
     const q = (this.q = this.qs[qi]);
-    this.all = q.t.split(' ');
+    this.all = (q.t || '').trim().replace(/\s+/g, ' ').split(' ').filter(w => w.length > 0);
     this.ri = 0; this.full = false; this.early = false; this.phase = 'reading';
     const daily = this.state.mode === 'daily';
     this.set({
@@ -515,7 +515,9 @@ export class GameEngine {
   /** Reveals the next word of the question. */
   private readTick() {
     if (this.tutorialPaused) return;
+    if (this.ri >= this.all.length) { this.full = true; this.openWindow(); return; }
     const w = this.all[this.ri++];
+    if (!w) { this.later(() => this.readTick(), 50); return; }
     this.addWord(w);
     sfx.word();
     this.full = this.ri >= this.all.length;
@@ -669,7 +671,7 @@ export class GameEngine {
     const q = this.q!, b = q.b, name = (team === 'you' ? this.state.you! : this.state.rival!).short;
     this.set({
       bonusCard: true, tag: 'Bonus for ' + name, answer: null,
-      words: b.t.split(' ').map((text, i) => ({ text, late: false, delay: i * 25 })),
+      words: (b.t || '').trim().replace(/\s+/g, ' ').split(' ').filter(w => w.length > 0).map((text, i) => ({ text, late: false, delay: i * 25 })),
     });
     if (team === 'you') {
       this.set({ zone: 'none', ask: null, rivalView: null, status: 'Bonus question. 10 points, no buzzer.' });
@@ -897,6 +899,7 @@ export class GameEngine {
   }
 
   onlineWord(data: { word: string; index: number; total: number }) {
+    if (!data.word) return;
     this.all[data.index] = data.word;
     this.ri = data.index + 1;
     this.addWord(data.word);
@@ -988,9 +991,10 @@ export class GameEngine {
     this.phase = 'bonus';
     const forMe = data.for_side === this.mySide;
     const name = forMe ? (this.state.you?.short ?? 'You') : (this.state.opponentName ?? 'Opponent');
+    const bonusWords = (data.text || '').trim().replace(/\s+/g, ' ').split(' ').filter(w => w.length > 0);
     this.set({
       bonusCard: true, tag: 'Bonus for ' + name, answer: null,
-      words: data.text.split(' ').map((text, i) => ({ text, late: false, delay: i * 25 })),
+      words: bonusWords.map((text, i) => ({ text, late: false, delay: i * 25 })),
     });
     if (forMe) {
       this.set({ zone: 'none', ask: null, rivalView: null, status: 'Bonus question. 10 points, no buzzer.' });
