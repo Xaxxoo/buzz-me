@@ -82,10 +82,10 @@ export class AuthClient {
     this.scheduleRefresh();
   }
 
-  async login(email: string, password: string) {
+  async login(identifier: string, password: string) {
     const res = await this.api.post<{ access_token: string; refresh_token: string; user: AuthUser }>(
       '/auth/login',
-      { email, password },
+      { identifier, password },
     );
     this.setTokens(res.access_token, res.refresh_token);
     this.set({ status: 'authenticated', user: res.user });

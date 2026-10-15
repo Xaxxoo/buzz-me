@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function Login({ active, auth, onSignup, onMenu }: Props) {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -19,10 +19,10 @@ export function Login({ active, auth, onSignup, onMenu }: Props) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!email || !password) { setError('Fill in both fields.'); return; }
+    if (!identifier || !password) { setError('Fill in both fields.'); return; }
     setBusy(true);
     try {
-      await auth.login(email, password);
+      await auth.login(identifier, password);
       onMenu();
     } catch (err: any) {
       setError(err?.message || 'Login failed.');
@@ -39,8 +39,8 @@ export function Login({ active, auth, onSignup, onMenu }: Props) {
       </div>
       <form className="auth-form flex flex-col gap-3.5 max-w-[380px] w-full mx-auto p-5 px-4" onSubmit={submit}>
         <label className="form-field flex flex-col gap-[5px]">
-          <span>Email</span>
-          <input className="form-input" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} />
+          <span>Username or Email</span>
+          <input className="form-input" type="text" autoComplete="username" value={identifier} onChange={e => setIdentifier(e.target.value)} />
         </label>
         <label className="form-field flex flex-col gap-[5px]">
           <span>Password</span>
