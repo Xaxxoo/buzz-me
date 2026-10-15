@@ -9,7 +9,7 @@ export function Backdrop({ flashKey, flashColor }: { flashKey: number; flashColo
   useEffect(() => (canvas.current ? confetti.attach(canvas.current) : undefined), []);
   return (
     <>
-      <div className="gradient-bg" aria-hidden="true" />
+      <div className="gradient-bg" aria-hidden="true"><i className="orb o1" /><i className="orb o2" /><i className="orb o3" /><i className="orb o4" /><i className="grain" /></div>
       <canvas id="fx" ref={canvas} aria-hidden="true" />
       <div key={flashKey} id="flash" className={'flash' + (flashKey ? ' go' : '')} aria-hidden="true" style={{ '--c': flashColor } as CSSProperties} />
     </>

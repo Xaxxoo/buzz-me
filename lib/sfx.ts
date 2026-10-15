@@ -24,6 +24,9 @@ function tone(f: number, at: number, dur: number, type: OscillatorType, vol: num
   }
 }
 
+/** A short vibration tick for selections. Android only; iOS browsers ignore it. */
+export const haptic = (ms = 8) => { if (!muted && typeof navigator !== 'undefined') navigator.vibrate?.(ms); };
+
 export const sfx = {
   tap() { tone(660, 0, 0.07, 'triangle', 0.12); },
   word() { tone(500 + Math.random() * 90, 0, 0.035, 'sine', 0.035); },

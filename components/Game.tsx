@@ -37,6 +37,25 @@ export default function Game() {
 
   /* hydrate auth first, then engine */
   useEffect(() => { auth.hydrate(); }, [auth]);
+
+  /* Android back button and iOS back-swipe: go back to the menu instead of leaving the game.
+     Every screen off the menu sits on one extra history entry; mid-match, back is ignored. */
+  useEffect(() => {
+    const away = s.screen !== 's-title';
+    const pushed = history.state?.quad === 1;
+    if (away && !pushed) history.pushState({ quad: 1 }, '');
+    else if (!away && pushed) history.back();
+  }, [s.screen]);
+  useEffect(() => {
+    const onPop = () => {
+      const scr = engine.getSnapshot().screen;
+      if (scr === 's-title') return;
+      if (scr === 's-match' || scr === 's-vs') { history.pushState({ quad: 1 }, ''); return; }
+      engine.menu();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [engine]);
   useEffect(() => {
     if (authState.status !== 'loading') engine.hydrate();
   }, [engine, authState.status]);
