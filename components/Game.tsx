@@ -27,7 +27,7 @@ import type { DbCategory, TeamData, ChallengeData, UniversityProfileData } from 
  * Every screen stays mounted and is shown or hidden, which keeps the picker's scroll
  * position and lets CSS entrance animations replay each time a screen appears.
  */
-export default function Game() {
+export default function Game({ joinCode }: { joinCode?: string } = {}) {
   const [auth] = useState(() => new AuthClient());
   const [engine] = useState(() => { const e = new GameEngine(); e.auth = auth; return e; });
   const [socket] = useState(() => new SocketClient(engine, auth));
@@ -84,6 +84,12 @@ export default function Game() {
     }
     return () => socket.disconnect();
   }, [socket, auth, authState.status]);
+
+  /* auto-join a private match when arriving via /join/[code] */
+  useEffect(() => {
+    if (!joinCode) return;
+    engine.setPendingJoin(joinCode);
+  }, [engine, joinCode]);
 
   /* online/offline detection */
   useEffect(() => {
@@ -157,15 +163,15 @@ export default function Game() {
   const onCancelFind = () => { socket.cancelFind(); engine.cancelFind(); };
 
   /* ---------- friendly (private) match ---------- */
-  const [joinCode, setJoinCode] = useState('');
+  const [manualCode, setManualCode] = useState('');
   const onFriendly = () => {
     engine.startPrivateMatch();
     socket.createPrivateMatch();
   };
   const onJoinPrivate = () => {
-    if (!joinCode.trim()) return;
+    if (!manualCode.trim()) return;
     engine.joinPrivateMatch();
-    socket.joinPrivateMatch(joinCode.trim());
+    socket.joinPrivateMatch(manualCode.trim());
   };
   const onCancelPrivate = () => {
     engine.cancelPrivateMatch();

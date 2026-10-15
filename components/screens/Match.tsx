@@ -49,13 +49,23 @@ function TeamPanel({ team, school, score, seat }: { team: Team; school: School; 
 
 function PrivateMatchPanel({ code, onJoin, onCancel }: { code: string | null; onJoin?: (code: string) => void; onCancel?: () => void }) {
   const [joinCode, setJoinCode] = useState('');
+  const [copied, setCopied] = useState(false);
+  const copyLink = () => {
+    const url = `${window.location.origin}/join/${code}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
   return (
     <div className="private-panel flex flex-col items-center gap-3">
       {code && (
         <div className="flex flex-col items-center gap-1">
           <span className="text-sm">Your room code:</span>
           <span className="private-code">{code}</span>
-          <span className="text-xs opacity-70">Share this with your opponent</span>
+          <button className="btn small" type="button" onClick={copyLink}>
+            {copied ? 'Copied!' : 'Copy link'}
+          </button>
         </div>
       )}
       <div className="flex flex-col items-center gap-2">
