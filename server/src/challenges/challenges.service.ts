@@ -30,18 +30,15 @@ export class ChallengesService implements OnModuleInit {
   async create(userId: string, dto: CreateChallengeDto) {
     const user = await this.userRepo.findOneBy({ id: userId });
     if (!user) throw new NotFoundException('User not found');
-    if (!user.university_verified || !user.university_id) {
-      throw new ForbiddenException('You must be a verified university member to create a challenge');
-    }
 
     const shareCode = randomBytes(6).toString('hex').slice(0, 12).toUpperCase();
 
-    if (dto.guest_university_id && dto.guest_university_id === user.university_id) {
+    if (dto.guest_university_id && user.university_id && dto.guest_university_id === user.university_id) {
       throw new BadRequestException('You cannot target your own university');
     }
 
     const challenge = this.challengeRepo.create({
-      host_university_id: user.university_id,
+      host_university_id: user.university_id || null,
       created_by: userId,
       categories: dto.categories || [],
       question_count: dto.question_count || 20,
@@ -96,22 +93,19 @@ export class ChallengesService implements OnModuleInit {
   async accept(userId: string, challengeId: string) {
     const user = await this.userRepo.findOneBy({ id: userId });
     if (!user) throw new NotFoundException('User not found');
-    if (!user.university_verified || !user.university_id) {
-      throw new ForbiddenException('You must be a verified university member to accept a challenge');
-    }
 
     const challenge = await this.findOne(challengeId);
     if (challenge.status !== 'open') {
       throw new BadRequestException('Challenge is no longer open');
     }
-    if (challenge.host_university_id === user.university_id) {
+    if (user.university_id && challenge.host_university_id === user.university_id) {
       throw new BadRequestException('You cannot accept your own university\'s challenge');
     }
-    if (challenge.guest_university_id && challenge.guest_university_id !== user.university_id) {
+    if (challenge.guest_university_id && user.university_id && challenge.guest_university_id !== user.university_id) {
       throw new BadRequestException('This challenge is directed at a different university');
     }
 
-    challenge.guest_university_id = user.university_id;
+    challenge.guest_university_id = user.university_id || challenge.guest_university_id;
     challenge.status = 'accepted';
     const saved = await this.challengeRepo.save(challenge);
 

@@ -12,10 +12,10 @@ export class Challenge {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('uuid')
-  host_university_id: string;
+  @Column({ type: 'uuid', nullable: true })
+  host_university_id: string | null;
 
-  @ManyToOne(() => University, { onDelete: 'CASCADE' })
+  @ManyToOne(() => University, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'host_university_id' })
   host_university: University;
 
