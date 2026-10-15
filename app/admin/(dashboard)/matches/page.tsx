@@ -1,12 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { AuthClient } from '@/lib/auth';
-import { createAdminApi, type AdminMatch, type Paginated } from '@/lib/admin-api';
+import { adminApi } from '@/lib/admin-auth';
+import type { AdminMatch, Paginated } from '@/lib/admin-api';
 import DataTable from '@/components/admin/DataTable';
-
-const auth = new AuthClient();
-const adminApi = createAdminApi(auth.api);
 
 export default function AdminMatches() {
   const [data, setData] = useState<Paginated<AdminMatch> | null>(null);
@@ -21,7 +18,7 @@ export default function AdminMatches() {
     adminApi.fetchMatches(p, 20, filters).then(setData).catch(() => {});
   }, [filterStatus, filterType]);
 
-  useEffect(() => { auth.hydrate().then(() => load(page)); }, [page, load]);
+  useEffect(() => { load(page); }, [page, load]);
 
   return (
     <div className="admin-page">

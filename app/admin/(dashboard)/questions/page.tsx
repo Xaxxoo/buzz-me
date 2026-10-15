@@ -1,13 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { AuthClient } from '@/lib/auth';
-import { createAdminApi, type AdminQuestion, type AdminCategory, type Paginated } from '@/lib/admin-api';
+import { adminApi } from '@/lib/admin-auth';
+import type { AdminQuestion, AdminCategory, Paginated } from '@/lib/admin-api';
 import DataTable from '@/components/admin/DataTable';
 import Modal from '@/components/admin/Modal';
-
-const auth = new AuthClient();
-const adminApi = createAdminApi(auth.api);
 
 const EMPTY: Partial<AdminQuestion> = {
   category_id: '', text: '', options: ['', ''], correct_option_index: 0, difficulty: 'medium',
@@ -30,10 +27,8 @@ export default function AdminQuestions() {
   }, [filterCat, filterDiff]);
 
   useEffect(() => {
-    auth.hydrate().then(() => {
-      load(page);
-      adminApi.fetchCategories().then(setCategories).catch(() => {});
-    });
+    load(page);
+    adminApi.fetchCategories().then(setCategories).catch(() => {});
   }, [page, load]);
 
   const openCreate = () => { setEditing({ ...EMPTY, category_id: categories[0]?.id ?? '' }); setModalOpen(true); };

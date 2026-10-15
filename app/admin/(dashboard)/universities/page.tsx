@@ -1,13 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { AuthClient } from '@/lib/auth';
-import { createAdminApi, type AdminUniversity, type Paginated } from '@/lib/admin-api';
+import { adminApi } from '@/lib/admin-auth';
+import type { AdminUniversity, Paginated } from '@/lib/admin-api';
 import DataTable from '@/components/admin/DataTable';
 import Modal from '@/components/admin/Modal';
-
-const auth = new AuthClient();
-const adminApi = createAdminApi(auth.api);
 
 const EMPTY = {
   name: '', short_name: '', country: '', email_domains: [] as string[],
@@ -26,7 +23,7 @@ export default function AdminUniversities() {
     adminApi.fetchUniversities(p, 20, q || undefined).then(setData).catch(() => {});
   }, []);
 
-  useEffect(() => { auth.hydrate().then(() => load(page, search)); }, [page, search, load]);
+  useEffect(() => { load(page, search); }, [page, search, load]);
 
   const openCreate = () => { setEditing({ ...EMPTY }); setModalOpen(true); };
   const openEdit = (u: AdminUniversity) => { setEditing({ ...u, email_domains: [...u.email_domains] }); setModalOpen(true); };

@@ -2,27 +2,26 @@
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
-import { AuthClient } from '@/lib/auth';
-
-const auth = new AuthClient();
+import { adminAuth, adminApi } from '@/lib/admin-auth';
 
 export default function AdminLogin() {
   const router = useRouter();
-  const authState = useSyncExternalStore(auth.subscribe, auth.getSnapshot, () => ({ status: 'loading' as const, user: null }));
+  const authState = useSyncExternalStore(adminAuth.subscribe, adminAuth.getSnapshot, () => ({ status: 'loading' as const, user: null }));
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { auth.hydrate(); }, []);
+  useEffect(() => { adminAuth.hydrate(); }, []);
 
   // If already authenticated, check admin and redirect
   useEffect(() => {
     if (authState.status === 'authenticated') {
-      auth.api.get<{ is_admin: boolean }>('/users/me').then(u => {
-        if (u.is_admin) router.replace('/admin');
-        else setError('This account does not have admin access.');
-      }).catch(() => {});
+      adminApi.fetchStats().then(() => {
+        router.replace('/admin');
+      }).catch(() => {
+        setError('This account does not have admin access.');
+      });
     }
   }, [authState.status, router]);
 
@@ -32,16 +31,18 @@ export default function AdminLogin() {
     if (!identifier || !password) { setError('Fill in both fields.'); return; }
     setBusy(true);
     try {
-      await auth.login(identifier, password);
-      const user = await auth.api.get<{ is_admin: boolean }>('/users/me');
-      if (!user.is_admin) {
-        await auth.logout();
+      await adminAuth.login(identifier, password);
+      // Verify admin access by hitting an admin endpoint
+      await adminApi.fetchStats();
+      router.replace('/admin');
+    } catch (err: any) {
+      const msg = err?.message || 'Login failed.';
+      if (err?.status === 403) {
+        await adminAuth.logout();
         setError('This account does not have admin access.');
       } else {
-        router.replace('/admin');
+        setError(msg);
       }
-    } catch (err: any) {
-      setError(err?.message || 'Login failed.');
     } finally {
       setBusy(false);
     }

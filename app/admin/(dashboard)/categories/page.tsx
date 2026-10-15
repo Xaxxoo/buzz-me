@@ -1,12 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AuthClient } from '@/lib/auth';
-import { createAdminApi, type AdminCategory } from '@/lib/admin-api';
+import { adminApi } from '@/lib/admin-auth';
+import type { AdminCategory } from '@/lib/admin-api';
 import Modal from '@/components/admin/Modal';
-
-const auth = new AuthClient();
-const adminApi = createAdminApi(auth.api);
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState<AdminCategory[]>([]);
@@ -15,7 +12,7 @@ export default function AdminCategories() {
 
   const load = () => { adminApi.fetchCategories().then(setCategories).catch(() => {}); };
 
-  useEffect(() => { auth.hydrate().then(load); }, []);
+  useEffect(() => { load(); }, []);
 
   const openCreate = () => { setEditing({ name: '', slug: '' }); setModalOpen(true); };
   const openEdit = (c: AdminCategory) => { setEditing({ id: c.id, name: c.name, slug: c.slug }); setModalOpen(true); };

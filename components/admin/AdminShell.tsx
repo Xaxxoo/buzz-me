@@ -3,9 +3,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { AuthClient } from '@/lib/auth';
-
-const auth = new AuthClient();
+import { adminAuth, adminApi } from '@/lib/admin-auth';
 
 const NAV = [
   { href: '/admin', label: 'Overview', icon: '\u25A3' },
@@ -20,11 +18,11 @@ const NAV = [
 export default function AdminShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const authState = useSyncExternalStore(auth.subscribe, auth.getSnapshot, () => ({ status: 'loading' as const, user: null }));
+  const authState = useSyncExternalStore(adminAuth.subscribe, adminAuth.getSnapshot, () => ({ status: 'loading' as const, user: null }));
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => { auth.hydrate(); }, []);
+  useEffect(() => { adminAuth.hydrate(); }, []);
 
   useEffect(() => {
     if (authState.status === 'guest') {
@@ -32,10 +30,13 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       return;
     }
     if (authState.status === 'authenticated') {
-      auth.api.get<{ is_admin: boolean }>('/users/me').then(u => {
-        if (!u.is_admin) router.replace('/admin/login');
-        else setIsAdmin(true);
-      }).catch(() => router.replace('/admin/login'));
+      adminApi.fetchStats().then(() => {
+        // If stats fetch succeeds, we're an admin
+        setIsAdmin(true);
+      }).catch(() => {
+        // 403 = not admin, 401 = token invalid
+        router.replace('/admin/login');
+      });
     }
   }, [authState.status, router]);
 

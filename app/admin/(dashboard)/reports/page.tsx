@@ -1,12 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { AuthClient } from '@/lib/auth';
-import { createAdminApi, type AdminReport, type Paginated } from '@/lib/admin-api';
+import { adminApi } from '@/lib/admin-auth';
+import type { AdminReport, Paginated } from '@/lib/admin-api';
 import DataTable from '@/components/admin/DataTable';
-
-const auth = new AuthClient();
-const adminApi = createAdminApi(auth.api);
 
 export default function AdminReports() {
   const [data, setData] = useState<Paginated<AdminReport> | null>(null);
@@ -16,7 +13,7 @@ export default function AdminReports() {
     adminApi.fetchReports(p).then(setData).catch(() => {});
   }, []);
 
-  useEffect(() => { auth.hydrate().then(() => load(page)); }, [page, load]);
+  useEffect(() => { load(page); }, [page, load]);
 
   const updateStatus = async (id: string, status: string) => {
     await adminApi.updateReportStatus(id, status);

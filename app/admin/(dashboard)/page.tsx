@@ -1,20 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AuthClient } from '@/lib/auth';
-import { createAdminApi, type AdminStats } from '@/lib/admin-api';
+import { adminApi, type AdminStats } from '@/lib/admin-auth';
 import StatsGrid from '@/components/admin/StatsGrid';
-
-const auth = new AuthClient();
-const adminApi = createAdminApi(auth.api);
 
 export default function AdminOverview() {
   const [stats, setStats] = useState<AdminStats | null>(null);
 
   useEffect(() => {
-    auth.hydrate().then(() => {
-      adminApi.fetchStats().then(setStats).catch(() => {});
-    });
+    adminApi.fetchStats().then(setStats).catch(() => {});
   }, []);
 
   if (!stats) return <div className="admin-loading">Loading stats...</div>;

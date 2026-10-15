@@ -1,12 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { AuthClient } from '@/lib/auth';
-import { createAdminApi, type AdminUser, type Paginated } from '@/lib/admin-api';
+import { adminApi } from '@/lib/admin-auth';
+import type { AdminUser, Paginated } from '@/lib/admin-api';
 import DataTable from '@/components/admin/DataTable';
-
-const auth = new AuthClient();
-const adminApi = createAdminApi(auth.api);
 
 export default function AdminUsers() {
   const [data, setData] = useState<Paginated<AdminUser> | null>(null);
@@ -18,7 +15,7 @@ export default function AdminUsers() {
     adminApi.fetchUsers(p, 20, q || undefined).then(setData).catch(() => {});
   }, []);
 
-  useEffect(() => { auth.hydrate().then(() => load(page, search)); }, [page, search, load]);
+  useEffect(() => { load(page, search); }, [page, search, load]);
 
   const toggleAdmin = async (user: AdminUser) => {
     await adminApi.updateUser(user.id, { is_admin: !user.is_admin });
