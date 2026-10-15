@@ -1,9 +1,39 @@
 import { API_BASE } from './config';
+import type { Question } from './types';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
   }
+}
+
+/** Shape returned by the server's question entity (with category relation loaded). */
+export interface DbQuestion {
+  id: string;
+  category_id: string;
+  category: { id: string; name: string; slug: string };
+  difficulty: string;
+  text: string;
+  options: string[];
+  correct_option_index: number;
+  bonus_text: string | null;
+  bonus_options: string[] | null;
+  source: string | null;
+  active: boolean;
+  created_at: string;
+}
+
+/** Map a DB question row into the compact frontend Question shape. */
+export function mapQuestion(q: DbQuestion): Question {
+  return {
+    t: q.text,
+    o: q.options,
+    c: q.category.name,
+    b: {
+      t: q.bonus_text ?? q.text,
+      o: q.bonus_options ?? q.options,
+    },
+  };
 }
 
 export interface Api {

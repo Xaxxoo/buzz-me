@@ -101,6 +101,13 @@ export interface UniversityProfileData {
   upcoming_challenges: ChallengeData[];
 }
 
+export interface DbCategory {
+  id: string;
+  name: string;
+  slug: string;
+  count: number;
+}
+
 /** A question and its options. The first option is always the right one. */
 export interface QA {
   t: string;
