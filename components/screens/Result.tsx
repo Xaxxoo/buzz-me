@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Crest } from '@/components/Crest';
 import { StatCells } from '@/components/screens/Stats';
 import { DAILY, GAME_NAME } from '@/lib/config';
@@ -18,34 +18,32 @@ interface Props {
   onSignup: () => void;
 }
 
-/* Remounted for every new result (key), so the scores count up from zero and the copy button resets. */
+/* Remounted for every new result (key), so the scores count up from zero and the share menu resets. */
 function Card({ result, authStatus, onAgain, onMenu, onSignup }: { result: MatchResult | DailyResult; authStatus: AuthStatus; onAgain: () => void; onMenu: () => void; onSignup: () => void }) {
   const daily = result.kind === 'daily';
   const mine = useCountUp(daily ? result.score : result.scoreYou, 900, 0);
   const theirs = useCountUp(daily ? 0 : result.scoreRival, 900, 0);
-  const [copy, setCopy] = useState<'idle' | 'copied' | 'manual'>('idle');
-  const fallback = useRef<HTMLParagraphElement>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const text = shareText(result, GAME_NAME);
+  const url = typeof window !== 'undefined' ? window.location.origin : '';
+  const full = `${text}\n\n${url}`;
 
-  /* Where the clipboard is refused, show the text selected so it can be copied by hand. */
-  useEffect(() => {
-    if (copy !== 'manual' || !fallback.current) return;
-    const range = document.createRange();
-    range.selectNodeContents(fallback.current);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-  }, [copy]);
-
-  const onCopy = () => {
-    try {
-      navigator.clipboard.writeText(text).then(
-        () => { setCopy('copied'); setTimeout(() => setCopy(c => (c === 'copied' ? 'idle' : c)), 1600); },
-        () => setCopy('manual'),
-      );
-    } catch {
-      setCopy('manual');
+  const onShare = async () => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ text: full });
+        return;
+      } catch { /* user cancelled or unsupported — fall through to menu */ }
     }
+    setShareOpen(o => !o);
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(full).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   return (
@@ -75,15 +73,20 @@ function Card({ result, authStatus, onAgain, onMenu, onSignup }: { result: Match
       </div>
       <div className="actions grid grid-cols-2 gap-2.5">
         <button className="btn" id="again" type="button" onClick={onAgain}>{daily ? 'Play a match' : 'Rematch'}</button>
-        <button className="btn ghost" id="copy" type="button" onClick={onCopy}>
-          {copy === 'copied' ? 'Copied' : copy === 'manual' ? 'Select and copy below' : 'Copy result'}
-        </button>
+        <button className="btn ghost" id="share" type="button" onClick={onShare}>Share</button>
         <button className="btn ghost" id="to-menu" type="button" onClick={onMenu}>Menu</button>
       </div>
+      {shareOpen && (
+        <div className="share-links flex justify-center gap-3 flex-wrap">
+          <a className="btn ghost small" href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(full)}`} target="_blank" rel="noopener noreferrer">X / Twitter</a>
+          <a className="btn ghost small" href={`https://wa.me/?text=${encodeURIComponent(full)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+          <a className="btn ghost small" href={`https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(full)}&u=${encodeURIComponent(url)}`} target="_blank" rel="noopener noreferrer">Facebook</a>
+          <button className="btn ghost small" type="button" onClick={copyToClipboard}>{copied ? 'Copied!' : 'Copy'}</button>
+        </div>
+      )}
       {authStatus === 'guest' && (
         <button className="btn ghost save-cta" type="button" onClick={onSignup}>Create an account to save your progress</button>
       )}
-      {copy === 'manual' && <p className="copyfallback" id="copyfallback" ref={fallback}>{text}</p>}
     </>
   );
 }
