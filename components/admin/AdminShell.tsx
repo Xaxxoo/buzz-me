@@ -28,14 +28,14 @@ export default function AdminShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (authState.status === 'guest') {
-      router.replace('/');
+      router.replace('/admin/login');
       return;
     }
     if (authState.status === 'authenticated') {
       auth.api.get<{ is_admin: boolean }>('/users/me').then(u => {
-        if (!u.is_admin) router.replace('/');
+        if (!u.is_admin) router.replace('/admin/login');
         else setIsAdmin(true);
-      }).catch(() => router.replace('/'));
+      }).catch(() => router.replace('/admin/login'));
     }
   }, [authState.status, router]);
 
