@@ -124,6 +124,8 @@ export interface GameState {
   /* tutorial */
   tutorialStep: number;
   tutorialTip: string;
+  /* invite link */
+  pendingJoinCode: string | null;
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
@@ -168,6 +170,7 @@ const initial = (): GameState => ({
   questionsError: null,
   tutorialStep: 0,
   tutorialTip: '',
+  pendingJoinCode: null,
 });
 
 export class GameEngine {
@@ -412,6 +415,13 @@ export class GameEngine {
   cancelPrivateMatch() {
     this.set({ privateWaiting: false, privateCode: null });
     this.menu();
+  }
+  setPendingJoin(code: string) {
+    this.set({ pendingJoinCode: code });
+    if (!this.requireAuth()) return;
+  }
+  clearPendingJoin() {
+    this.set({ pendingJoinCode: null });
   }
 
   /* ---------- match flow ---------- */

@@ -187,6 +187,13 @@ export class SocketClient {
       if (snap.screen === 's-match' && snap.matchMode === 'online' && snap.matchId) {
         s.emit('match:reconnect', { match_id: snap.matchId });
       }
+      // Auto-join a private match if arriving via invite link
+      if (snap.pendingJoinCode) {
+        const code = snap.pendingJoinCode;
+        this.engine.joinPrivateMatch();
+        s.emit('match:join_private', { code });
+        this.engine.clearPendingJoin();
+      }
     });
 
     s.on('connect_error', async () => {
