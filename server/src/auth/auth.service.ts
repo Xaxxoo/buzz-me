@@ -50,11 +50,12 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, deviceName: string) {
-    const user = await this.usersRepo.findOne({
-      where: { email: dto.email.toLowerCase() },
-    });
+    const id = dto.identifier.toLowerCase();
+    const user = id.includes('@')
+      ? await this.usersRepo.findOne({ where: { email: id } })
+      : await this.usersRepo.findOne({ where: { username_lower: id } });
     if (!user || !(await bcrypt.compare(dto.password, user.password_hash))) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Invalid username/email or password');
     }
 
     return this.createTokenPair(user, deviceName);
