@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from 'typeorm';
+import { Question } from './question.entity';
 
 @Entity('categories')
 export class Category {
@@ -16,4 +17,7 @@ export class Category {
 
   @CreateDateColumn()
   created_at: Date;
+
+  @OneToMany(() => Question, q => q.category)
+  questions: Question[];
 }

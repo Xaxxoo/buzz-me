@@ -64,6 +64,27 @@ export class QuestionsService {
     return a.slice(0, count);
   }
 
+  /** Random set filtered by category slugs (for the /questions/random endpoint). */
+  async getRandomSetByCategories(count: number, categorySlugs: string[]) {
+    const qb = this.repo.createQueryBuilder('q')
+      .innerJoinAndSelect('q.category', 'c')
+      .where('q.active = :active', { active: true });
+
+    if (categorySlugs.length > 0) {
+      qb.andWhere('c.slug IN (:...slugs)', { slugs: categorySlugs });
+    }
+
+    const questions = await qb.getMany();
+
+    // Fisher-Yates shuffle
+    const a = questions.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a.slice(0, count);
+  }
+
   /** Admin: paginated list with optional filters. */
   async findAll(opts: { page: number; limit: number; categoryId?: string; difficulty?: string; active?: boolean }) {
     const { page, limit, categoryId, difficulty, active } = opts;
