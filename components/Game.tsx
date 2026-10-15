@@ -20,7 +20,7 @@ import { API_BASE, GAME_NAME } from '@/lib/config';
 import { GameEngine } from '@/lib/engine';
 import { registerPush } from '@/lib/push';
 import { SocketClient } from '@/lib/socket';
-import type { TeamData, ChallengeData, UniversityProfileData } from '@/lib/types';
+import type { DbCategory, TeamData, ChallengeData, UniversityProfileData } from '@/lib/types';
 
 /**
  * The whole game is one client component tree driven by a GameEngine instance.
@@ -34,6 +34,20 @@ export default function Game() {
   const authState = useSyncExternalStore(auth.subscribe, auth.getSnapshot, auth.getSnapshot);
   const s = useSyncExternalStore(engine.subscribe, engine.getSnapshot, engine.getSnapshot);
   const stage = useRef<HTMLElement>(null);
+
+  /* fetch categories from API (public endpoint, no auth needed) */
+  const [dbCategories, setDbCategories] = useState<DbCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  useEffect(() => {
+    fetch(`${API_BASE}/categories/with-counts`)
+      .then(r => r.ok ? r.json() : Promise.reject(r))
+      .then((cats: DbCategory[]) => {
+        setDbCategories(cats);
+        engine.dbCategories = cats;
+      })
+      .catch(() => {})
+      .finally(() => setCategoriesLoading(false));
+  }, [engine]);
 
   /* hydrate auth first, then engine */
   useEffect(() => { auth.hydrate(); }, [auth]);
@@ -338,6 +352,7 @@ export default function Game() {
         <Picker
           key={s.pickKey} active={s.screen === 's-pick'} you={s.you} forDaily={s.pending === 'daily'}
           selectedCategories={s.selectedCategories} difficulty={s.difficulty}
+          categories={dbCategories} categoriesLoading={categoriesLoading}
           onSetCategories={cats => engine.setCategories(cats)} onSetDifficulty={d => engine.setDifficulty(d)}
           onChoose={sch => engine.choose(sch)} onGo={() => engine.go()} onMenu={() => engine.menu()}
         />

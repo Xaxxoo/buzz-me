@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Crest } from '@/components/Crest';
 import { ROUNDS } from '@/lib/config';
-import { LOCAL_CATEGORIES, availableCount } from '@/lib/data/questions';
 import { ALL, COUNTRIES, UNIS, fold, school } from '@/lib/schools';
 import { haptic, sfx } from '@/lib/sfx';
-import type { School } from '@/lib/types';
+import type { DbCategory, School } from '@/lib/types';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 
@@ -17,6 +16,8 @@ interface Props {
   forDaily: boolean;
   selectedCategories: string[];
   difficulty: Difficulty;
+  categories: DbCategory[];
+  categoriesLoading: boolean;
   onSetCategories: (cats: string[]) => void;
   onSetDifficulty: (d: Difficulty) => void;
   onChoose: (s: School) => void;
@@ -46,7 +47,7 @@ function Row({ s, sub, add, picked, onChoose }: { s: School; sub: string; add?: 
  * The daily has no setup, so it only shows the school step.
  * Game.tsx remounts this each time the picker opens, so search, country and step start fresh.
  */
-export function Picker({ active, you, forDaily, selectedCategories, difficulty, onSetCategories, onSetDifficulty, onChoose, onGo, onMenu }: Props) {
+export function Picker({ active, you, forDaily, selectedCategories, difficulty, categories, categoriesLoading, onSetCategories, onSetDifficulty, onChoose, onGo, onMenu }: Props) {
   const [step, setStep] = useState<'school' | 'setup'>(() => (you && !forDaily ? 'setup' : 'school'));
   const [country, setCountry] = useState<string | null>(() => (you && UNIS[you.country] ? you.country : null));
   const [query, setQuery] = useState('');
@@ -95,7 +96,9 @@ export function Picker({ active, you, forDaily, selectedCategories, difficulty, 
     }
   };
 
-  const poolSize = availableCount(selectedCategories);
+  const poolSize = selectedCategories.length === 0
+    ? categories.reduce((s, c) => s + c.count, 0)
+    : categories.filter(c => selectedCategories.includes(c.name)).reduce((s, c) => s + c.count, 0);
   const tooFew = selectedCategories.length > 0 && poolSize < ROUNDS;
   const level = LEVELS.findIndex(l => l.id === difficulty);
 
@@ -143,13 +146,15 @@ export function Picker({ active, you, forDaily, selectedCategories, difficulty, 
                 aria-pressed={selectedCategories.length === 0}
                 onClick={() => { sfx.tap(); onSetCategories([]); }}
               >Everything</button>
-              {LOCAL_CATEGORIES.map(cat => (
-                <button
-                  key={cat} type="button" className="cat-chip"
-                  aria-pressed={selectedCategories.includes(cat)}
-                  onClick={() => toggleCat(cat)}
-                >{cat}</button>
-              ))}
+              {categoriesLoading
+                ? <span className="hint">Loading topics…</span>
+                : categories.map(cat => (
+                  <button
+                    key={cat.slug} type="button" className="cat-chip"
+                    aria-pressed={selectedCategories.includes(cat.name)}
+                    onClick={() => toggleCat(cat.name)}
+                  >{cat.name}</button>
+                ))}
             </div>
             <p className={'hint' + (tooFew ? ' warn' : '')} aria-live="polite">
               {selectedCategories.length === 0
