@@ -111,6 +111,20 @@ export class AuthService {
     if (!result.affected) throw new BadRequestException('Session not found');
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.usersRepo.findOneBy({ id: userId });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) throw new BadRequestException('Current password is incorrect');
+
+    user.password_hash = await bcrypt.hash(newPassword, 12);
+    user.must_reset_password = false;
+    await this.usersRepo.save(user);
+
+    return { message: 'Password changed successfully' };
+  }
+
   private issueAccessToken(user: User): string {
     return this.jwtService.sign({
       sub: user.id,
@@ -137,6 +151,7 @@ export class AuthService {
         username: user.username,
         email: user.email,
         rating: user.rating,
+        must_reset_password: user.must_reset_password,
       },
     };
   }
