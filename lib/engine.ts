@@ -953,7 +953,7 @@ export class GameEngine {
     for (let s = 3; s >= 1; s--) this.later(() => sfx.tick(), (data.seconds - s) * 1000);
   }
 
-  onlineAnswerResult(data: { correct: boolean; correct_answer: string; points: number; score_a: number; score_b: number }) {
+  onlineAnswerResult(data: { correct: boolean; correct_answer: string; points: number; score_a: number; score_b: number; remaining_words?: string[] }) {
     this.cut();
     const myScore = this.mySide === 'a' ? data.score_a : data.score_b;
     const theirScore = this.mySide === 'a' ? data.score_b : data.score_a;
@@ -965,6 +965,10 @@ export class GameEngine {
       this.set({
         ask: { ...view, paused: true, options: view.options.map(o => ({ ...o, disabled: true, mark: o.text === data.correct_answer ? 'right' as const : o.mark })) },
       });
+    }
+    // Merge remaining words that were never sent during reading (early buzz)
+    if (data.remaining_words?.length) {
+      for (const w of data.remaining_words) this.all.push(w);
     }
     this.fillRest();
     this.set({ answer: data.correct_answer });

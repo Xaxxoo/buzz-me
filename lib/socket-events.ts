@@ -53,7 +53,7 @@ export interface ServerToClientEvents {
   'match:buzz_open': (data: { duration_ms: number }) => void;
   'match:buzzed': (data: { side: string; username: string }) => void;
   'match:ask': (data: { options: string[]; seconds: number; struck?: string }) => void;
-  'match:answer_result': (data: { correct: boolean; correct_answer: string; points: number; score_a: number; score_b: number }) => void;
+  'match:answer_result': (data: { correct: boolean; correct_answer: string; points: number; score_a: number; score_b: number; remaining_words?: string[] }) => void;
   'match:rebound': (data: { options: string[]; seconds: number; struck: string }) => void;
   'match:bonus': (data: { text: string; options: string[]; seconds: number; for_side: string }) => void;
   'match:bonus_result': (data: { correct: boolean; correct_answer: string; points: number; score_a: number; score_b: number }) => void;
