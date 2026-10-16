@@ -95,9 +95,16 @@ export interface AdminQuestion {
   created_at: string;
 }
 
+export interface ActivityPoint {
+  date: string;
+  signups: number;
+  matches: number;
+}
+
 export function createAdminApi(api: Api) {
   return {
     fetchStats: () => api.get<AdminStats>('/admin/stats'),
+    fetchActivity: (days = 30) => api.get<ActivityPoint[]>(`/admin/stats/activity?days=${days}`),
 
     fetchUsers: (page = 1, limit = 20, q?: string) =>
       api.get<Paginated<AdminUser>>(`/admin/users?page=${page}&limit=${limit}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
