@@ -151,6 +151,10 @@ export class AuthClient {
   }
 
   private retryRefresh(attempt: number) {
+    if (attempt > 3) {
+      this.logout();
+      return;
+    }
     const delay = Math.min(1000 * Math.pow(2, attempt), 30_000);
     this.refreshTimer = setTimeout(() => {
       this.doRefresh().catch(() => this.retryRefresh(attempt + 1));
