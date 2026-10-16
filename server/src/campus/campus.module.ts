@@ -5,9 +5,10 @@ import { CampusService } from './campus.service';
 import { Campus } from '../entities/campus.entity';
 import { CampusLandmark } from '../entities/campus-landmark.entity';
 import { University } from '../entities/university.entity';
+import { User } from '../entities/user.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Campus, CampusLandmark, University])],
+  imports: [TypeOrmModule.forFeature([Campus, CampusLandmark, University, User])],
   controllers: [CampusController],
   providers: [CampusService],
   exports: [CampusService],
