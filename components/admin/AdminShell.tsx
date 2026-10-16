@@ -40,7 +40,10 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  useEffect(() => { adminAuth.hydrate(); }, []);
+  useEffect(() => {
+    // Only hydrate on cold page loads — skip if already authenticated from login
+    if (adminAuth.getSnapshot().status === 'loading') adminAuth.hydrate();
+  }, []);
 
   useEffect(() => {
     try { if (localStorage.getItem('admin-sidebar-collapsed') === 'true') setCollapsed(true); } catch {}
