@@ -36,7 +36,7 @@ export interface ServerToClientEvents {
   'match:ask': (data: { options: string[]; seconds: number; struck?: string }) => void;
   'match:answer_result': (data: {
     correct: boolean; correct_answer: string; points: number;
-    score_a: number; score_b: number;
+    score_a: number; score_b: number; remaining_words?: string[];
   }) => void;
   'match:rebound': (data: { options: string[]; seconds: number; struck: string }) => void;
   'match:bonus': (data: { text: string; options: string[]; seconds: number; for_side: string }) => void;

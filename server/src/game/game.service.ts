@@ -754,6 +754,13 @@ export class GameService {
     room.epoch++;
   }
 
+  /** Words that were never sent because someone buzzed early. */
+  private remainingWords(room: GameRoom): string[] {
+    const q = room.questions[room.currentRound];
+    if (!q || !q.words || room.wordIndex >= q.words.length) return [];
+    return q.words.slice(room.wordIndex);
+  }
+
   private emitToRoom(room: GameRoom, event: string, data: any) {
     const emitSlot = (slot: PlayerSlot | BotSlot | TeamSlot) => {
       if (isBot(slot)) return;
@@ -951,6 +958,7 @@ export class GameService {
         points: pts,
         score_a: room.playerA.score,
         score_b: room.playerB.score,
+        remaining_words: this.remainingWords(room),
       });
 
       // Go to bonus
@@ -968,6 +976,7 @@ export class GameService {
         points: penalty,
         score_a: room.playerA.score,
         score_b: room.playerB.score,
+        remaining_words: this.remainingWords(room),
       });
 
       // Rebound to other side
@@ -1019,6 +1028,7 @@ export class GameService {
         points: pts,
         score_a: room.playerA.score,
         score_b: room.playerB.score,
+        remaining_words: this.remainingWords(room),
       });
 
       this.scheduleTimer(room, () => this.startBonus(room, side), 1500);
@@ -1029,6 +1039,7 @@ export class GameService {
         points: 0,
         score_a: room.playerA.score,
         score_b: room.playerB.score,
+        remaining_words: this.remainingWords(room),
       });
 
       this.emitToRoom(room, 'match:round_end', {
@@ -1461,6 +1472,7 @@ export class GameService {
           points: pts,
           score_a: room.playerA.score,
           score_b: room.playerB.score,
+          remaining_words: this.remainingWords(room),
         });
 
         this.scheduleTimer(room, () => this.startBonus(room, 'b'), 1500);
@@ -1475,6 +1487,7 @@ export class GameService {
           points: penalty,
           score_a: room.playerA.score,
           score_b: room.playerB.score,
+          remaining_words: this.remainingWords(room),
         });
 
         // Rebound to player A
@@ -1497,6 +1510,7 @@ export class GameService {
         points: pts,
         score_a: room.playerA.score,
         score_b: room.playerB.score,
+        remaining_words: this.remainingWords(room),
       });
       this.scheduleTimer(room, () => this.startBonus(room, 'b'), 1500);
     } else {
@@ -1506,6 +1520,7 @@ export class GameService {
         points: 0,
         score_a: room.playerA.score,
         score_b: room.playerB.score,
+        remaining_words: this.remainingWords(room),
       });
       this.emitToRoom(room, 'match:round_end', {
         round: room.currentRound + 1,
