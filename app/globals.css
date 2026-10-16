@@ -917,6 +917,45 @@
   /* --- Section --- */
   .admin-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .admin-section-title { font: 600 14px var(--font-body); color: var(--color-ink); letter-spacing: -.01em; }
+
+  /* --- Charts --- */
+  .admin-charts-row {
+    display: grid; grid-template-columns: 2fr 1fr; gap: 14px;
+  }
+  .admin-chart-card {
+    background: var(--color-surface); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px; padding: 20px 22px; min-width: 0;
+  }
+  .admin-chart-card--wide { min-height: 260px; }
+  .admin-chart-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px; gap: 12px; flex-wrap: wrap;
+  }
+  .admin-chart-title { font: 600 14px var(--font-body); color: var(--color-ink); letter-spacing: -.01em; }
+  .admin-chart-legend { display: flex; align-items: center; gap: 6px; }
+  .admin-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .admin-legend-label { font: 500 11.5px var(--font-body); color: var(--color-muted); margin-right: 8px; }
+  .admin-chart-svg { width: 100%; height: auto; display: block; }
+  .admin-chart-label { font: 400 9.5px var(--font-body); fill: rgba(255,255,255,0.3); }
+  .admin-chart-skeleton { padding: 20px 0; }
+
+  /* --- Horizontal bars --- */
+  .admin-bars { display: flex; flex-direction: column; gap: 10px; }
+  .admin-bar-row { display: flex; align-items: center; gap: 10px; }
+  .admin-bar-label {
+    width: 90px; flex-shrink: 0; font: 500 12px var(--font-body); color: var(--color-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .admin-bar-track {
+    flex: 1; height: 8px; border-radius: 100px;
+    background: rgba(255,255,255,0.04); overflow: hidden;
+  }
+  .admin-bar-fill {
+    height: 100%; border-radius: 100px; min-width: 2px;
+    background: linear-gradient(90deg, rgba(198,244,50,0.5), rgba(198,244,50,0.8));
+    transition: width 600ms cubic-bezier(.4,0,.2,1);
+  }
+  .admin-bar-value { width: 36px; text-align: right; font: 600 12px var(--font-body); color: rgba(255,255,255,0.6); flex-shrink: 0; }
 }
 
 /* --- Responsive --- */
@@ -929,6 +968,7 @@
   .admin-body { padding: 20px 16px; }
   .admin-stats-grid { grid-template-columns: repeat(2, 1fr); }
   .admin-card-grid { grid-template-columns: repeat(2, 1fr); }
+  .admin-charts-row { grid-template-columns: 1fr; }
   .admin-shell.collapsed .admin-content { margin-left: 0; }
   .admin-topbar-user { display: none; }
 }
