@@ -3,6 +3,9 @@ import { DataSource } from 'typeorm';
 import { University } from '../entities/university.entity';
 import { Question } from '../entities/question.entity';
 import { Category } from '../entities/category.entity';
+import { User } from '../entities/user.entity';
+import { DeviceSession } from '../entities/device-session.entity';
+import * as bcrypt from 'bcrypt';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
@@ -149,7 +152,7 @@ async function seed() {
           password: process.env.DB_PASSWORD || 'postgres',
           database: process.env.DB_NAME || 'quad',
         }),
-    entities: [University, Question, Category],
+    entities: [University, Question, Category, User, DeviceSession],
     synchronize: true,
   });
 
@@ -238,6 +241,46 @@ async function seed() {
     console.log(`  Questions: ${Math.min(i + 200, allNewQs.length)}/${allNewQs.length}`);
   }
   console.log(`Seeded ${allNewQs.length} questions (${skipped} duplicates skipped)`);
+
+  // 4. Seed admin users
+  const userRepo = ds.getRepository(User);
+  const ADMINS = [
+    { email: 'bnahmad83@gmail.com', username: 'bnahmad83' },
+    { email: 'ebere.onyenekwu@gmail.com', username: 'Ebere_onyenekwu' },
+    { email: 'chike4u@gmail.com', username: 'chike4u' },
+  ];
+
+  const defaultPasswordHash = await bcrypt.hash('1234567890', 12);
+  let adminsCreated = 0;
+
+  for (const admin of ADMINS) {
+    const existing = await userRepo.findOne({ where: { email: admin.email.toLowerCase() } });
+    if (existing) {
+      if (!existing.is_admin) {
+        existing.is_admin = true;
+        existing.must_reset_password = true;
+        existing.password_hash = defaultPasswordHash;
+        await userRepo.save(existing);
+        adminsCreated++;
+        console.log(`  Admin ${admin.email} promoted to admin`);
+      } else {
+        console.log(`  Admin ${admin.email} already exists — skipped`);
+      }
+      continue;
+    }
+    const user = userRepo.create({
+      username: admin.username,
+      username_lower: admin.username.toLowerCase(),
+      email: admin.email.toLowerCase(),
+      password_hash: defaultPasswordHash,
+      is_admin: true,
+      must_reset_password: true,
+    });
+    await userRepo.save(user);
+    adminsCreated++;
+    console.log(`  Admin ${admin.email} created`);
+  }
+  console.log(`Seeded ${adminsCreated} admin users`);
 
   await ds.destroy();
   console.log('Seed complete.');
