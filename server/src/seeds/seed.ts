@@ -5,6 +5,8 @@ import { Question } from '../entities/question.entity';
 import { Category } from '../entities/category.entity';
 import { User } from '../entities/user.entity';
 import { DeviceSession } from '../entities/device-session.entity';
+import { Campus } from '../entities/campus.entity';
+import { CampusLandmark } from '../entities/campus-landmark.entity';
 import * as bcrypt from 'bcrypt';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
@@ -152,7 +154,7 @@ async function seed() {
           password: process.env.DB_PASSWORD || 'postgres',
           database: process.env.DB_NAME || 'quad',
         }),
-    entities: [University, Question, Category, User, DeviceSession],
+    entities: [University, Question, Category, User, DeviceSession, Campus, CampusLandmark],
     synchronize: true,
   });
 
@@ -281,6 +283,121 @@ async function seed() {
     console.log(`  Admin ${admin.email} created`);
   }
   console.log(`Seeded ${adminsCreated} admin users`);
+
+  // 5. Seed campuses + landmarks
+  const campusRepo = ds.getRepository(Campus);
+  const landmarkRepo = ds.getRepository(CampusLandmark);
+
+  const CAMPUS_SEEDS: {
+    uniName: string;
+    campusName: string;
+    layout: Record<string, any>;
+    landmarks: { key: string; name: string; description: string; x: number; y: number }[];
+  }[] = [
+    {
+      uniName: 'University of Lagos',
+      campusName: 'UNILAG Main Campus',
+      layout: {
+        bounds: { width: 100, height: 100 },
+        buildings: [
+          { key: 'main_gate', name: 'Main Gate', x: 50, y: 95, width: 12, height: 6, color: '#8E1B3A', type: 'gate' },
+          { key: 'library', name: 'University Library', x: 40, y: 55, width: 18, height: 14, color: '#F5C518', type: 'library' },
+          { key: 'faculty_block', name: 'Faculty of Science', x: 65, y: 45, width: 16, height: 12, color: '#8E1B3A', type: 'faculty' },
+          { key: 'hostel', name: 'Moremi Hall', x: 25, y: 30, width: 14, height: 10, color: '#D4A373', type: 'hostel' },
+          { key: 'sports_ground', name: 'Sports Centre', x: 75, y: 70, width: 20, height: 16, color: '#2D6A4F', type: 'sports' },
+          { key: 'cafeteria', name: 'Indomie Joint', x: 45, y: 75, width: 10, height: 8, color: '#E76F51', type: 'cafeteria' },
+        ],
+      },
+      landmarks: [
+        { key: 'main_gate', name: 'Main Gate', description: 'The iconic UNILAG entrance on Akoka Road', x: 50, y: 95 },
+        { key: 'library', name: 'University Library', description: 'Central library and study hub', x: 40, y: 55 },
+        { key: 'faculty_block', name: 'Faculty of Science', description: 'Home of the science departments', x: 65, y: 45 },
+        { key: 'hostel', name: 'Moremi Hall', description: 'Female hall of residence', x: 25, y: 30 },
+        { key: 'sports_ground', name: 'Sports Centre', description: 'Athletics track and sports facilities', x: 75, y: 70 },
+        { key: 'cafeteria', name: 'Indomie Joint', description: 'Popular campus food spot', x: 45, y: 75 },
+      ],
+    },
+    {
+      uniName: 'University of Nigeria',
+      campusName: 'UNN Nsukka Campus',
+      layout: {
+        bounds: { width: 100, height: 100 },
+        buildings: [
+          { key: 'main_gate', name: 'Main Gate', x: 50, y: 98, width: 12, height: 5, color: '#0B8457', type: 'gate' },
+          { key: 'library', name: 'Nnamdi Azikiwe Library', x: 45, y: 50, width: 20, height: 14, color: '#FFD23F', type: 'library' },
+          { key: 'faculty_block', name: 'Faculty of Engineering', x: 70, y: 40, width: 16, height: 12, color: '#0B8457', type: 'faculty' },
+          { key: 'hostel', name: 'Zik Flat', x: 20, y: 25, width: 14, height: 10, color: '#D4A373', type: 'hostel' },
+          { key: 'sports_ground', name: 'UNN Stadium', x: 60, y: 75, width: 22, height: 16, color: '#2D6A4F', type: 'sports' },
+          { key: 'cafeteria', name: 'Caf Block', description: 'Main cafeteria area', x: 35, y: 65, width: 10, height: 8, color: '#E76F51', type: 'cafeteria' },
+        ],
+      },
+      landmarks: [
+        { key: 'main_gate', name: 'Main Gate', description: 'Nsukka campus main entrance', x: 50, y: 98 },
+        { key: 'library', name: 'Nnamdi Azikiwe Library', description: 'The renowned central library', x: 45, y: 50 },
+        { key: 'faculty_block', name: 'Faculty of Engineering', description: 'Engineering complex at Nsukka', x: 70, y: 40 },
+        { key: 'hostel', name: 'Zik Flat', description: 'Student residential block', x: 20, y: 25 },
+        { key: 'sports_ground', name: 'UNN Stadium', description: 'Main sports and athletics arena', x: 60, y: 75 },
+        { key: 'cafeteria', name: 'Caf Block', description: 'Main cafeteria area', x: 35, y: 65 },
+      ],
+    },
+    {
+      uniName: 'Ahmadu Bello University',
+      campusName: 'ABU Zaria Campus',
+      layout: {
+        bounds: { width: 100, height: 100 },
+        buildings: [
+          { key: 'main_gate', name: 'Main Gate', x: 50, y: 97, width: 14, height: 6, color: '#0B8457', type: 'gate' },
+          { key: 'library', name: 'Kashim Ibrahim Library', x: 48, y: 48, width: 20, height: 14, color: '#FFD23F', type: 'library' },
+          { key: 'faculty_block', name: 'Faculty of Medicine', x: 72, y: 38, width: 16, height: 12, color: '#0B8457', type: 'faculty' },
+          { key: 'hostel', name: 'Danfodiyo Hall', x: 22, y: 28, width: 14, height: 10, color: '#D4A373', type: 'hostel' },
+          { key: 'sports_ground', name: 'ABU Stadium', x: 65, y: 72, width: 22, height: 16, color: '#2D6A4F', type: 'sports' },
+          { key: 'cafeteria', name: 'SUG Cafeteria', x: 38, y: 68, width: 10, height: 8, color: '#E76F51', type: 'cafeteria' },
+        ],
+      },
+      landmarks: [
+        { key: 'main_gate', name: 'Main Gate', description: 'Historic ABU Zaria entrance', x: 50, y: 97 },
+        { key: 'library', name: 'Kashim Ibrahim Library', description: 'One of the largest university libraries in West Africa', x: 48, y: 48 },
+        { key: 'faculty_block', name: 'Faculty of Medicine', description: 'Premier medical faculty', x: 72, y: 38 },
+        { key: 'hostel', name: 'Danfodiyo Hall', description: 'Student hall of residence', x: 22, y: 28 },
+        { key: 'sports_ground', name: 'ABU Stadium', description: 'Multi-purpose sports complex', x: 65, y: 72 },
+        { key: 'cafeteria', name: 'SUG Cafeteria', description: 'Student Union cafeteria', x: 38, y: 68 },
+      ],
+    },
+  ];
+
+  let campusesCreated = 0;
+  for (const seed of CAMPUS_SEEDS) {
+    const existing = await campusRepo.findOneBy({ name: seed.campusName });
+    if (existing) {
+      console.log(`  Campus "${seed.campusName}" already exists — skipped`);
+      continue;
+    }
+
+    const uni = await uniRepo.findOneBy({ name: seed.uniName });
+    const campus = campusRepo.create({
+      name: seed.campusName,
+      university_id: uni?.id ?? null,
+      layout: seed.layout,
+      active: true,
+    });
+    const saved = await campusRepo.save(campus);
+
+    const landmarks = seed.landmarks.map((l) =>
+      landmarkRepo.create({
+        campus_id: saved.id,
+        key: l.key,
+        name: l.name,
+        description: l.description,
+        position_x: l.x,
+        position_y: l.y,
+        challenge_question_count: 5,
+      }),
+    );
+    await landmarkRepo.save(landmarks);
+    campusesCreated++;
+    console.log(`  Campus "${seed.campusName}" created with ${landmarks.length} landmarks`);
+  }
+  console.log(`Seeded ${campusesCreated} campuses`);
 
   await ds.destroy();
   console.log('Seed complete.');
