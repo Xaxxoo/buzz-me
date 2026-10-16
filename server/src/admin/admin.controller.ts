@@ -17,6 +17,11 @@ export class AdminController {
     return this.service.getStats();
   }
 
+  @Get('stats/activity')
+  getActivity(@Query('days') days?: string) {
+    return this.service.getActivity(days ? parseInt(days, 10) : 30);
+  }
+
   @Get('users')
   getUsers(
     @Query('page') page?: string,

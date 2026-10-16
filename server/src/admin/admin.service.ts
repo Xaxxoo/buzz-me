@@ -51,6 +51,51 @@ export class AdminService {
     };
   }
 
+  async getActivity(days = 30) {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    since.setHours(0, 0, 0, 0);
+
+    const [signupRows, matchRows] = await Promise.all([
+      this.userRepo
+        .createQueryBuilder('u')
+        .select("DATE(u.created_at)", 'date')
+        .addSelect('COUNT(*)::int', 'count')
+        .where('u.created_at >= :since', { since })
+        .groupBy('DATE(u.created_at)')
+        .orderBy('DATE(u.created_at)', 'ASC')
+        .getRawMany<{ date: string; count: number }>(),
+      this.matchRepo
+        .createQueryBuilder('m')
+        .select("DATE(m.created_at)", 'date')
+        .addSelect('COUNT(*)::int', 'count')
+        .where('m.created_at >= :since', { since })
+        .groupBy('DATE(m.created_at)')
+        .orderBy('DATE(m.created_at)', 'ASC')
+        .getRawMany<{ date: string; count: number }>(),
+    ]);
+
+    const map: Record<string, { signups: number; matches: number }> = {};
+    for (const r of signupRows) {
+      const d = String(r.date).slice(0, 10);
+      map[d] = { signups: Number(r.count), matches: 0 };
+    }
+    for (const r of matchRows) {
+      const d = String(r.date).slice(0, 10);
+      if (!map[d]) map[d] = { signups: 0, matches: 0 };
+      map[d].matches = Number(r.count);
+    }
+
+    const result: { date: string; signups: number; matches: number }[] = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date(since);
+      d.setDate(since.getDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      result.push({ date: key, signups: map[key]?.signups ?? 0, matches: map[key]?.matches ?? 0 });
+    }
+    return result;
+  }
+
   async getUsers(page = 1, limit = 20, q?: string) {
     const where: any = {};
     if (q) where.username = ILike(`%${q}%`);
