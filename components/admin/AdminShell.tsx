@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { adminAuth, adminApi } from '@/lib/admin-auth';
+import { adminAuth } from '@/lib/admin-auth';
 import { createApi } from '@/lib/api';
 
 const I = { w: 20, h: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -53,18 +53,19 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     }
     if (authState.status === 'authenticated') {
       const api = createApi(() => adminAuth.getToken(), async () => null);
-      Promise.all([
-        adminApi.fetchStats(),
-        api.get<{ must_reset_password?: boolean }>('/users/me'),
-      ]).then(([, profile]) => {
-        if (profile.must_reset_password) {
-          router.replace('/admin/reset-password');
-        } else {
-          setIsAdmin(true);
-        }
-      }).catch(() => {
-        router.replace('/admin/login');
-      });
+      api.get<{ is_admin?: boolean; must_reset_password?: boolean }>('/users/me')
+        .then((profile) => {
+          if (!profile.is_admin) {
+            router.replace('/admin/login');
+          } else if (profile.must_reset_password) {
+            router.replace('/admin/reset-password');
+          } else {
+            setIsAdmin(true);
+          }
+        })
+        .catch(() => {
+          router.replace('/admin/login');
+        });
     }
   }, [authState.status, router]);
 
