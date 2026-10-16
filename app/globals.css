@@ -615,7 +615,7 @@
   }
   @keyframes admin-spin { to { transform: rotate(360deg); } }
 
-  body:has(.admin-shell) { overflow: auto; }
+  html:has(.admin-shell), body:has(.admin-shell) { height: auto; overflow: auto; }
   body:has(.admin-login-page) { background: var(--color-bg); }
 
   /* --- Shell --- */
