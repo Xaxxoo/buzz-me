@@ -101,6 +101,40 @@ export interface ActivityPoint {
   matches: number;
 }
 
+export interface CampusLayout {
+  bounds: { width: number; height: number };
+  buildings: {
+    key: string; name: string; x: number; y: number;
+    width: number; height: number; color: string; type: string;
+  }[];
+}
+
+export interface AdminCampus {
+  id: string;
+  university_id: string | null;
+  university?: { id: string; name: string; short_name: string } | null;
+  name: string;
+  layout: CampusLayout;
+  asset_url: string | null;
+  fallback_image_url: string | null;
+  osm_attribution: string | null;
+  active: boolean;
+  created_at: string;
+  landmarks?: AdminCampusLandmark[];
+}
+
+export interface AdminCampusLandmark {
+  id: string;
+  campus_id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  position_x: number;
+  position_y: number;
+  challenge_question_count: number;
+  created_at: string;
+}
+
 export function createAdminApi(api: Api) {
   return {
     fetchStats: () => api.get<AdminStats>('/admin/stats'),
@@ -148,5 +182,19 @@ export function createAdminApi(api: Api) {
     createUniversity: (data: any) => api.post('/universities', data),
     updateUniversity: (id: string, data: any) => api.put(`/universities/${id}`, data),
     deleteUniversity: (id: string) => api.del(`/universities/${id}`),
+
+    fetchCampuses: () => api.get<AdminCampus[]>('/admin/campuses'),
+    fetchCampus: (id: string) => api.get<AdminCampus>(`/admin/campuses/${id}`),
+    createCampus: (data: any) => api.post<AdminCampus>('/admin/campuses', data),
+    updateCampus: (id: string, data: any) => api.put<AdminCampus>(`/admin/campuses/${id}`, data),
+    deleteCampus: (id: string) => api.del(`/admin/campuses/${id}`),
+
+    fetchCampusLandmarks: (campusId: string) =>
+      api.get<AdminCampusLandmark[]>(`/admin/campuses/${campusId}/landmarks`),
+    createCampusLandmark: (campusId: string, data: any) =>
+      api.post<AdminCampusLandmark>(`/admin/campuses/${campusId}/landmarks`, data),
+    updateCampusLandmark: (id: string, data: any) =>
+      api.put<AdminCampusLandmark>(`/admin/campuses/landmarks/${id}`, data),
+    deleteCampusLandmark: (id: string) => api.del(`/admin/campuses/landmarks/${id}`),
   };
 }

@@ -17,6 +17,7 @@ function Icon({ name }: { name: string }) {
     case 'layers': return <svg {...I}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>;
     case 'flag': return <svg {...I}><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>;
     case 'building': return <svg {...I}><path d="M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>;
+    case 'map': return <svg {...I}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>;
     default: return null;
   }
 }
@@ -29,6 +30,7 @@ const NAV = [
   { href: '/admin/categories', label: 'Categories', icon: 'layers' },
   { href: '/admin/reports', label: 'Reports', icon: 'flag' },
   { href: '/admin/universities', label: 'Universities', icon: 'building' },
+  { href: '/admin/campuses', label: 'Campuses', icon: 'map' },
 ];
 
 export default function AdminShell({ children }: { children: ReactNode }) {
