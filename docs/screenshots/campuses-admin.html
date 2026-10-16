@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campus World — Admin Campuses Page</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Unbounded:wght@700;800;900&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --color-sun: #c6f432;
+    --color-sun-deep: #a8d020;
+    --color-ink: #f0ebe3;
+    --color-paper: #131211;
+    --color-buzz: #E8322C;
+    --color-fog: #2a2724;
+    --color-bg: #0a0a09;
+    --color-surface: #131211;
+    --color-muted: #8a847b;
+    --color-rival: #5b8def;
+    --font-display: 'Unbounded', 'Arial Black', system-ui, sans-serif;
+    --font-body: 'Inter Tight', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
+
+  /* ---- Shell ---- */
+  .admin-shell { display: flex; min-height: 100vh; background: var(--color-bg); }
+  .admin-sidebar { position: fixed; top: 0; left: 0; z-index: 100; width: 256px; height: 100vh; display: flex; flex-direction: column; background: var(--color-surface); border-right: 1px solid rgba(255,255,255,0.06); overflow: hidden; }
+  .admin-sidebar-header { padding: 20px 18px 16px; }
+  .admin-logo { display: flex; align-items: center; gap: 10px; font: 800 17px/1 var(--font-display); color: var(--color-sun); text-decoration: none; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; }
+  .admin-nav { flex: 1; padding: 4px 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; overflow-x: hidden; }
+  .admin-nav-link { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 8px; font: 500 13.5px/1.2 var(--font-body); color: rgba(255,255,255,0.5); text-decoration: none; cursor: pointer; border: none; background: none; white-space: nowrap; overflow: hidden; width: 100%; text-align: left; transition: color 150ms ease, background 150ms ease; }
+  .admin-nav-link:hover { background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.85); }
+  .admin-nav-link.active { background: rgba(198,244,50,0.08); color: var(--color-sun); }
+  .admin-nav-icon { width: 20px; height: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .admin-nav-label { overflow: hidden; text-overflow: ellipsis; }
+  .admin-sidebar-footer { padding: 8px 10px 14px; border-top: 1px solid rgba(255,255,255,0.04); display: flex; flex-direction: column; gap: 2px; }
+
+  /* ---- Content ---- */
+  .admin-content { flex: 1; margin-left: 256px; display: flex; flex-direction: column; min-height: 100vh; }
+  .admin-topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 28px; height: 56px; flex-shrink: 0; border-bottom: 1px solid rgba(255,255,255,0.06); background: var(--color-surface); position: sticky; top: 0; z-index: 50; }
+  .admin-topbar-title { font: 600 15px/1 var(--font-body); color: var(--color-ink); }
+  .admin-topbar-right { display: flex; align-items: center; gap: 12px; position: relative; }
+  .admin-profile { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px; border-radius: 8px; transition: background 120ms ease; }
+  .admin-profile:hover { background: rgba(255,255,255,0.04); }
+  .admin-avatar { width: 30px; height: 30px; border-radius: 8px; background: rgba(198,244,50,0.1); color: var(--color-sun); display: flex; align-items: center; justify-content: center; font: 700 12px var(--font-body); flex-shrink: 0; }
+  .admin-topbar-user { font: 500 13px var(--font-body); color: rgba(255,255,255,0.7); }
+  .admin-body { flex: 1; padding: 28px; max-width: 1400px; width: 100%; }
+
+  /* ---- Page + Toolbar ---- */
+  .admin-page { display: flex; flex-direction: column; gap: 20px; }
+  .admin-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+  /* ---- Buttons ---- */
+  .admin-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer; font: 600 13px var(--font-body); background: var(--color-sun); color: #0a0a09; transition: opacity 150ms ease, transform 80ms ease; }
+  .admin-btn:hover { opacity: .88; }
+  .admin-btn.ghost { background: rgba(255,255,255,0.04); color: var(--color-ink); border: 1px solid rgba(255,255,255,0.08); }
+  .admin-btn.small { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
+  .admin-btn.danger { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.15); }
+  .admin-actions { display: flex; gap: 6px; }
+
+  /* ---- Badges ---- */
+  .admin-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 100px; font: 600 11px var(--font-body); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+  .admin-badge.on { background: rgba(52,211,153,0.1); color: #34d399; }
+  .admin-badge.off { background: rgba(255,255,255,0.05); color: var(--color-muted); }
+
+  /* ---- Table ---- */
+  .admin-table-wrap { background: var(--color-surface); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; overflow: hidden; }
+  .admin-table { width: 100%; border-collapse: collapse; font: 400 13px var(--font-body); }
+  .admin-table th { text-align: left; padding: 11px 16px; font-weight: 500; font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--color-muted); background: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .admin-table td { padding: 11px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; color: rgba(255,255,255,0.8); }
+  .admin-table tbody tr { transition: background 80ms ease; }
+  .admin-table tbody tr:hover { background: rgba(255,255,255,0.015); }
+  .admin-table-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; font-size: 12px; color: var(--color-muted); border-top: 1px solid rgba(255,255,255,0.04); }
+  .admin-pagination { display: flex; align-items: center; gap: 8px; }
+  .admin-pagination button { padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); background: transparent; color: var(--color-ink); font: 500 12px var(--font-body); cursor: pointer; }
+
+  /* ---- Modal ---- */
+  .admin-modal-overlay { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .admin-modal { background: var(--color-surface); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; width: 100%; max-width: 520px; max-height: 85vh; overflow-y: auto; box-shadow: 0 24px 80px rgba(0,0,0,0.5); }
+  .admin-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .admin-modal-header h2 { font: 600 15px/1 var(--font-body); }
+  .admin-modal-close { background: none; border: none; color: var(--color-muted); font-size: 20px; cursor: pointer; padding: 4px; border-radius: 6px; }
+  .admin-modal-body { padding: 22px; }
+
+  /* ---- Form ---- */
+  .admin-form { display: flex; flex-direction: column; gap: 16px; }
+  .admin-form label { display: flex; flex-direction: column; gap: 6px; font: 500 11.5px var(--font-body); color: var(--color-muted); text-transform: uppercase; letter-spacing: .06em; }
+  .admin-input { width: 100%; padding: 9px 13px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: var(--color-ink); font: 400 13.5px var(--font-body); outline: none; }
+  .admin-input:focus { border-color: rgba(198,244,50,0.35); box-shadow: 0 0 0 3px rgba(198,244,50,0.06); }
+  select.admin-input { appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a847b' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+  textarea.admin-input { resize: vertical; min-height: 60px; }
+  .admin-form-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 8px; }
+
+  /* ---- Utilities ---- */
+  .section-title { font-size: 14px; font-weight: 600; color: var(--color-ink); }
+  .landmark-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--color-fog); }
+  .landmark-name { font-weight: 600; font-size: 13px; color: var(--color-ink); }
+  .landmark-meta { color: var(--color-muted); font-size: 12px; margin-left: 8px; }
+  .landmark-section { border-top: 1px solid var(--color-fog); padding-top: 16px; }
+  .landmark-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .no-data { color: var(--color-muted); font-size: 13px; }
+  .checkbox-row { flex-direction: row !important; align-items: center !important; gap: 8px !important; }
+
+  /* ---- Screenshot Sections ---- */
+  .screenshot-section { margin-bottom: 40px; }
+  .screenshot-label { font: 700 13px var(--font-body); color: var(--color-sun); text-transform: uppercase; letter-spacing: .1em; padding: 12px 0; border-bottom: 1px solid var(--color-fog); margin-bottom: 20px; }
+</style>
+</head>
+<body>
+
+<!-- ================================================== -->
+<!-- SCREENSHOT 1: Full Admin Page with Sidebar + Table -->
+<!-- ================================================== -->
+<div class="screenshot-section">
+  <div class="screenshot-label">Screenshot 1: Campuses Admin — Table View</div>
+  <div class="admin-shell" style="height: 600px; position: relative; overflow: hidden; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">
+    <!-- Sidebar -->
+    <aside class="admin-sidebar" style="position: absolute;">
+      <div class="admin-sidebar-header">
+        <a class="admin-logo" href="#">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" opacity="0.15"/><path d="M8 16V8l8 4-8 4z" fill="currentColor"/></svg>
+          <span>CT Admin</span>
+        </a>
+      </div>
+      <nav class="admin-nav">
+        <a class="admin-nav-link" href="#">
+          <span class="admin-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
+          <span class="admin-nav-label">Overview</span>
+        </a>
+        <a class="admin-nav-link" href="#">
+          <span class="admin-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></span>
+          <span class="admin-nav-label">Players</span>
+        </a>
+        <a class="admin-nav-link" href="#">
+          <span class="admin-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+          <span class="admin-nav-label">Questions</span>
+        </a>
+        <a class="admin-nav-link" href="#">
+          <span class="admin-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
+          <span class="admin-nav-label">Matches</span>
+        </a>
+        <a class="admin-nav-link" href="#">
+          <span class="admin-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
+          <span class="admin-nav-label">Categories</span>
+        </a>
+        <a class="admin-nav-link" href="#">
+          <span class="admin-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></span>
+          <span class="admin-nav-label">Reports</span>
+        </a>
+        <a class="admin-nav-link" href="#">
+          <span class="admin-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></span>
+          <span class="admin-nav-label">Universities</span>
+        </a>
+        <a class="admin-nav-link active" href="#">
+          <span class="admin-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+          <span class="admin-nav-label">Campuses</span>
+        </a>
+      </nav>
+      <div class="admin-sidebar-footer">
+        <a class="admin-nav-link" href="#">
+          <span class="admin-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg></span>
+          <span class="admin-nav-label">Collapse</span>
+        </a>
+        <a class="admin-nav-link" href="#">
+          <span class="admin-nav-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></span>
+          <span class="admin-nav-label">Back to App</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-content">
+      <header class="admin-topbar">
+        <div><h1 class="admin-topbar-title">Campuses</h1></div>
+        <div class="admin-topbar-right">
+          <div class="admin-profile">
+            <div class="admin-avatar">B</div>
+            <span class="admin-topbar-user">bnahmad83</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </div>
+      </header>
+      <div class="admin-body">
+        <div class="admin-page">
+          <div class="admin-toolbar">
+            <div></div>
+            <button class="admin-btn">+ New Campus</button>
+          </div>
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>University</th>
+                  <th>Landmarks</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>UNILAG Main Campus</td>
+                  <td>University of Lagos</td>
+                  <td>6</td>
+                  <td><span class="admin-badge on">Active</span></td>
+                  <td>
+                    <div class="admin-actions">
+                      <button class="admin-btn small">Edit</button>
+                      <button class="admin-btn small danger">Del</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>UNN Nsukka Campus</td>
+                  <td>University of Nigeria</td>
+                  <td>6</td>
+                  <td><span class="admin-badge on">Active</span></td>
+                  <td>
+                    <div class="admin-actions">
+                      <button class="admin-btn small">Edit</button>
+                      <button class="admin-btn small danger">Del</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td>ABU Zaria Campus</td>
+                  <td>Ahmadu Bello University</td>
+                  <td>6</td>
+                  <td><span class="admin-badge on">Active</span></td>
+                  <td>
+                    <div class="admin-actions">
+                      <button class="admin-btn small">Edit</button>
+                      <button class="admin-btn small danger">Del</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="admin-table-footer">
+              <span>1–3 of 3</span>
+              <div class="admin-pagination">
+                <button disabled>Prev</button>
+                <span>Page 1 of 1</span>
+                <button disabled>Next</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ================================================== -->
+<!-- SCREENSHOT 2: Edit Campus Modal with Landmarks     -->
+<!-- ================================================== -->
+<div class="screenshot-section">
+  <div class="screenshot-label">Screenshot 2: Edit Campus Modal (with Landmarks)</div>
+  <div style="position: relative; height: 820px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; background: var(--color-bg);">
+    <!-- Dimmed background (table) -->
+    <div style="opacity: 0.3; pointer-events: none; padding: 28px;">
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Name</th><th>University</th><th>Landmarks</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>UNILAG Main Campus</td><td>University of Lagos</td><td>6</td><td><span class="admin-badge on">Active</span></td><td></td></tr>
+            <tr><td>UNN Nsukka Campus</td><td>University of Nigeria</td><td>6</td><td><span class="admin-badge on">Active</span></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <!-- Modal overlay -->
+    <div class="admin-modal-overlay" style="position: absolute; inset: 0;">
+      <div class="admin-modal" style="max-height: 780px;">
+        <div class="admin-modal-header">
+          <h2>Edit Campus</h2>
+          <button class="admin-modal-close">&times;</button>
+        </div>
+        <div class="admin-modal-body">
+          <div class="admin-form">
+            <label>Name
+              <input class="admin-input" value="UNILAG Main Campus">
+            </label>
+            <label>University
+              <select class="admin-input">
+                <option>— None —</option>
+                <option selected>University of Lagos</option>
+                <option>University of Nigeria</option>
+                <option>Ahmadu Bello University</option>
+              </select>
+            </label>
+            <label>Layout JSON
+              <textarea class="admin-input" rows="5" style="font-family: var(--font-mono); font-size: 12px;">{
+  "bounds": { "width": 100, "height": 100 },
+  "buildings": [
+    { "key": "main_gate", "name": "Main Gate", "x": 50, "y": 95, "width": 12, "height": 6, "color": "#8E1B3A", "type": "gate" },
+    { "key": "library", "name": "University Library", "x": 40, "y": 55, "width": 18, "height": 14, "color": "#F5C518", "type": "library" }
+  ]
+}</textarea>
+            </label>
+            <label>Fallback Image URL
+              <input class="admin-input" value="" placeholder="https://...">
+            </label>
+            <label>OSM Attribution
+              <input class="admin-input" value="">
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" checked>
+              Active
+            </label>
+
+            <!-- Landmarks section -->
+            <div class="landmark-section">
+              <div class="landmark-header">
+                <strong class="section-title">Landmarks (6)</strong>
+                <button class="admin-btn small">+ Add</button>
+              </div>
+              <div class="landmark-row">
+                <div>
+                  <span class="landmark-name">Main Gate</span>
+                  <span class="landmark-meta">main_gate (50, 95)</span>
+                </div>
+                <div class="admin-actions">
+                  <button class="admin-btn small">Edit</button>
+                  <button class="admin-btn small danger">Del</button>
+                </div>
+              </div>
+              <div class="landmark-row">
+                <div>
+                  <span class="landmark-name">University Library</span>
+                  <span class="landmark-meta">library (40, 55)</span>
+                </div>
+                <div class="admin-actions">
+                  <button class="admin-btn small">Edit</button>
+                  <button class="admin-btn small danger">Del</button>
+                </div>
+              </div>
+              <div class="landmark-row">
+                <div>
+                  <span class="landmark-name">Faculty of Science</span>
+                  <span class="landmark-meta">faculty_block (65, 45)</span>
+                </div>
+                <div class="admin-actions">
+                  <button class="admin-btn small">Edit</button>
+                  <button class="admin-btn small danger">Del</button>
+                </div>
+              </div>
+              <div class="landmark-row">
+                <div>
+                  <span class="landmark-name">Moremi Hall</span>
+                  <span class="landmark-meta">hostel (25, 30)</span>
+                </div>
+                <div class="admin-actions">
+                  <button class="admin-btn small">Edit</button>
+                  <button class="admin-btn small danger">Del</button>
+                </div>
+              </div>
+              <div class="landmark-row">
+                <div>
+                  <span class="landmark-name">Sports Centre</span>
+                  <span class="landmark-meta">sports_ground (75, 70)</span>
+                </div>
+                <div class="admin-actions">
+                  <button class="admin-btn small">Edit</button>
+                  <button class="admin-btn small danger">Del</button>
+                </div>
+              </div>
+              <div class="landmark-row">
+                <div>
+                  <span class="landmark-name">Indomie Joint</span>
+                  <span class="landmark-meta">cafeteria (45, 75)</span>
+                </div>
+                <div class="admin-actions">
+                  <button class="admin-btn small">Edit</button>
+                  <button class="admin-btn small danger">Del</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="admin-form-actions">
+              <button class="admin-btn">Save Campus</button>
+              <button class="admin-btn ghost">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================== -->
+<!-- SCREENSHOT 3: Add Landmark Modal                   -->
+<!-- ================================================== -->
+<div class="screenshot-section">
+  <div class="screenshot-label">Screenshot 3: Add Landmark Modal</div>
+  <div style="position: relative; height: 480px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; background: var(--color-bg);">
+    <div class="admin-modal-overlay" style="position: absolute; inset: 0;">
+      <div class="admin-modal">
+        <div class="admin-modal-header">
+          <h2>Add Landmark</h2>
+          <button class="admin-modal-close">&times;</button>
+        </div>
+        <div class="admin-modal-body">
+          <div class="admin-form">
+            <label>Key (e.g. library, main_gate)
+              <input class="admin-input" value="admin_block" maxlength="30">
+            </label>
+            <label>Name
+              <input class="admin-input" value="Admin Block" maxlength="80">
+            </label>
+            <label>Description
+              <input class="admin-input" value="Administrative offices and senate building">
+            </label>
+            <div style="display: flex; gap: 12px;">
+              <label style="flex: 1;">Position X
+                <input class="admin-input" type="number" value="55">
+              </label>
+              <label style="flex: 1;">Position Y
+                <input class="admin-input" type="number" value="35">
+              </label>
+            </div>
+            <label>Challenge Question Count
+              <input class="admin-input" type="number" value="5">
+            </label>
+            <div class="admin-form-actions">
+              <button class="admin-btn">Save Landmark</button>
+              <button class="admin-btn ghost">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================== -->
+<!-- SCREENSHOT 4: New Campus Modal (empty form)        -->
+<!-- ================================================== -->
+<div class="screenshot-section">
+  <div class="screenshot-label">Screenshot 4: New Campus Modal (empty form)</div>
+  <div style="position: relative; height: 560px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); overflow: hidden; background: var(--color-bg);">
+    <div class="admin-modal-overlay" style="position: absolute; inset: 0;">
+      <div class="admin-modal">
+        <div class="admin-modal-header">
+          <h2>New Campus</h2>
+          <button class="admin-modal-close">&times;</button>
+        </div>
+        <div class="admin-modal-body">
+          <div class="admin-form">
+            <label>Name
+              <input class="admin-input" value="" placeholder="e.g. UNILAG Main Campus">
+            </label>
+            <label>University
+              <select class="admin-input">
+                <option selected>— None —</option>
+                <option>Ahmadu Bello University</option>
+                <option>University of Lagos</option>
+                <option>University of Nigeria</option>
+              </select>
+            </label>
+            <label>Layout JSON
+              <textarea class="admin-input" rows="5" style="font-family: var(--font-mono); font-size: 12px;">{
+  "bounds": { "width": 100, "height": 100 },
+  "buildings": []
+}</textarea>
+            </label>
+            <label>Fallback Image URL
+              <input class="admin-input" value="" placeholder="https://...">
+            </label>
+            <label>OSM Attribution
+              <input class="admin-input" value="">
+            </label>
+            <label class="checkbox-row">
+              <input type="checkbox" checked>
+              Active
+            </label>
+            <div class="admin-form-actions">
+              <button class="admin-btn">Save Campus</button>
+              <button class="admin-btn ghost">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
