@@ -19,7 +19,7 @@ export class CampusLandmark {
   @Column({ length: 80 })
   name: string;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   description: string | null;
 
   @Column({ type: 'float', default: 0 })

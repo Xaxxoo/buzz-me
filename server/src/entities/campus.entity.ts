@@ -19,13 +19,13 @@ export class Campus {
   @Column({ type: 'jsonb', default: {} })
   layout: Record<string, any>;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   asset_url: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   fallback_image_url: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   osm_attribution: string | null;
 
   @Column({ default: true })
