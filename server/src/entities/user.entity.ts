@@ -53,6 +53,9 @@ export class User {
   @Column({ default: false })
   is_admin: boolean;
 
+  @Column({ default: false })
+  must_reset_password: boolean;
+
   /** { [category_slug]: [right, total] } — mirrors frontend Save.cats */
   @Column({ type: 'jsonb', default: {} })
   category_stats: Record<string, [number, number]>;
