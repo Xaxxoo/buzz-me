@@ -1,5 +1,5 @@
 import { createApi, type Api } from './api';
-import { REFRESH_KEY, TOKEN_KEY } from './config';
+import { API_BASE, REFRESH_KEY, TOKEN_KEY } from './config';
 
 export interface AuthUser {
   id: string;
@@ -112,10 +112,22 @@ export class AuthClient {
     const refreshToken = this.readStorage(REFRESH_KEY);
     if (!refreshToken || !this.accessToken) return null;
 
-    const res = await this.api.post<{ access_token: string; refresh_token: string }>(
-      '/auth/refresh',
-      { refresh_token: refreshToken },
-    );
+    // Use direct fetch — NOT this.api — to avoid the circular
+    // onUnauthorized → doRefresh → onUnauthorized loop.
+    const raw = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.accessToken}`,
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!raw.ok) {
+      throw new Error(`Refresh failed: ${raw.status}`);
+    }
+
+    const res: { access_token: string; refresh_token: string } = await raw.json();
     this.setTokens(res.access_token, res.refresh_token);
 
     // Decode user from the new token
