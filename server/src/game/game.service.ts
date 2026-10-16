@@ -912,6 +912,7 @@ export class GameService {
     // Send options only AFTER buzz accepted (anti-cheat)
     const q = room.questions[room.currentRound];
     const shuffled = this.shuffleOptions(q.options);
+    (room as any)._currentShuffled = shuffled;
 
     this.scheduleTimer(room, () => {
       this.emitToSide(room, side, 'match:ask', {
@@ -932,8 +933,6 @@ export class GameService {
     this.bumpEpoch(room);
     const q = room.questions[room.currentRound];
     // optionIndex -1 means timeout
-    const correct = optionIndex >= 0 && optionIndex === 0; // index 0 is always correct before shuffle
-    // Actually, we need to map back from shuffled. Let's track the correct answer text.
     const correctAnswer = q.options[q.correctIndex];
     const answeredText = optionIndex >= 0 ? (room as any)._currentShuffled?.[optionIndex] : null;
     const isCorrect = answeredText === correctAnswer;
@@ -988,6 +987,7 @@ export class GameService {
 
     const q = room.questions[room.currentRound];
     const shuffled = this.shuffleOptions(q.options);
+    (room as any)._currentShuffled = shuffled;
     this.emitToSide(room, side, 'match:rebound', {
       options: shuffled,
       seconds: ANSWER_WINDOW_S,
@@ -1054,6 +1054,7 @@ export class GameService {
 
     const cleanBonusText = bonusWords.join(' ');
     const shuffled = this.shuffleOptions(q.bonusOptions);
+    (room as any)._currentShuffled = shuffled;
 
     if (isBot(room.playerB) && forSide === 'b') {
       // Bot bonus
