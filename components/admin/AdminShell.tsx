@@ -4,6 +4,7 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { adminAuth, adminApi } from '@/lib/admin-auth';
+import { createApi } from '@/lib/api';
 
 const NAV = [
   { href: '/admin', label: 'Overview', icon: '\u25A3' },
@@ -30,11 +31,21 @@ export default function AdminShell({ children }: { children: ReactNode }) {
       return;
     }
     if (authState.status === 'authenticated') {
-      adminApi.fetchStats().then(() => {
-        // If stats fetch succeeds, we're an admin
-        setIsAdmin(true);
+      // Fetch profile to check must_reset_password
+      const api = createApi(
+        () => adminAuth.getToken(),
+        async () => null,
+      );
+      Promise.all([
+        adminApi.fetchStats(),
+        api.get<{ must_reset_password?: boolean }>('/users/me'),
+      ]).then(([, profile]) => {
+        if (profile.must_reset_password) {
+          router.replace('/admin/reset-password');
+        } else {
+          setIsAdmin(true);
+        }
       }).catch(() => {
-        // 403 = not admin, 401 = token invalid
         router.replace('/admin/login');
       });
     }

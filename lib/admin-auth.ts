@@ -21,4 +21,8 @@ const api = createApi(
 );
 
 /** Pre-built admin API using the non-retrying API client. */
-export const adminApi = createAdminApi(api);
+export const adminApi = {
+  ...createAdminApi(api),
+  changePassword: (current_password: string, new_password: string) =>
+    api.post('/auth/change-password', { current_password, new_password }),
+};
