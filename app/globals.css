@@ -615,7 +615,6 @@
   }
   @keyframes admin-spin { to { transform: rotate(360deg); } }
 
-  html:has(.admin-shell), body:has(.admin-shell) { height: auto; overflow: auto; }
   body:has(.admin-login-page) { background: var(--color-bg); }
 
   /* --- Shell --- */
@@ -957,6 +956,9 @@
   }
   .admin-bar-value { width: 36px; text-align: right; font: 600 12px var(--font-body); color: rgba(255,255,255,0.6); flex-shrink: 0; }
 }
+
+/* Un-layered so it beats Tailwind's utility-layer overflow-hidden on <body> */
+html:has(.admin-shell), body:has(.admin-shell) { height: auto; overflow: auto; }
 
 /* --- Responsive --- */
 @media (max-width: 768px) {
