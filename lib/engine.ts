@@ -241,9 +241,10 @@ export class GameEngine {
       if (this.revealFrozen) return;
       const elapsed = this.serverNow() - this.revealStartTime;
       const count = elapsed < 0 ? 0 : Math.min(Math.floor(elapsed / this.revealInterval) + 1, this.all.length);
-      if (count !== this.state.visibleCount) {
+      const prev = this.state.visibleCount;
+      if (count !== prev) {
         this.set({ visibleCount: count });
-        if (count > (this.state.visibleCount || 0)) sfx.word();
+        if (count > prev) sfx.word();
       }
       if (count < this.all.length) {
         this.revealRafId = requestAnimationFrame(tick);
@@ -298,7 +299,7 @@ export class GameEngine {
     else this.set({ scoreRival: this.state.scoreRival + d });
   }
   private took(v: Took) { const t = this.state.took.slice(); t[this.state.qi] = v; this.set({ took: t }); }
-  private addWord(text: string, late = false, delay?: number) { this.set({ words: [...this.state.words, { text, late, delay }] }); }
+  private addWord(text: string, late = false, delay?: number) { this.set({ words: [...this.state.words, { text, late, delay }], visibleCount: this.state.words.length + 1 }); }
   private fillRest() {
     this.showRestFaded();
   }
@@ -553,7 +554,7 @@ export class GameEngine {
     this.ri = 0; this.full = false; this.early = false; this.phase = 'reading';
     const daily = this.state.mode === 'daily';
     this.set({
-      tag: q.c, bonusCard: false, words: [], answer: null, stamp: null,
+      tag: q.c, bonusCard: false, words: [], visibleCount: 0, buzzedAtWord: -1, answer: null, stamp: null,
       zone: 'buzz', buzzLive: true, ask: null, rivalView: null, window: { key: this.key(), secs: 0 },
       status: daily
         ? `Question ${qi + 1} of ${this.qs.length}. The earlier you buzz, the more it's worth.`
