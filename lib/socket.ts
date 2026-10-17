@@ -10,11 +10,16 @@ export class SocketClient {
   private socket: GameSocket | null = null;
   private engine: GameEngine;
   private auth: AuthClient;
+  /** Estimated offset: serverTime ≈ Date.now() + clockOffset */
+  clockOffset = 0;
 
   constructor(engine: GameEngine, auth: AuthClient) {
     this.engine = engine;
     this.auth = auth;
   }
+
+  /** Returns estimated server time right now. */
+  clockNow() { return Date.now() + this.clockOffset; }
 
   connect() {
     if (this.socket?.connected) return;
@@ -128,7 +133,6 @@ export class SocketClient {
     s.on('match:found', d => this.engine.onlineMatchFound(d));
     s.on('match:countdown', d => this.engine.onlineCountdown(d));
     s.on('match:question', d => this.engine.onlineNewQuestion(d));
-    s.on('match:word', d => this.engine.onlineWord(d));
     s.on('match:buzz_open', d => this.engine.onlineBuzzOpen(d));
     s.on('match:buzzed', d => this.engine.onlineBuzzed(d));
     s.on('match:ask', d => this.engine.onlineAsk(d));
@@ -180,8 +184,18 @@ export class SocketClient {
       this.engine.setReconnecting(true);
     });
 
+    // Clock sync reply
+    s.on('time:sync_reply' as any, (data: { t0: number; t1: number }) => {
+      const t2 = Date.now();
+      const rtt = t2 - data.t0;
+      this.clockOffset = data.t1 - data.t0 - Math.round(rtt / 2);
+      this.engine.setClockOffset(this.clockOffset);
+    });
+
     s.on('connect', () => {
       this.engine.setReconnecting(false);
+      // Measure clock offset with server
+      s.emit('time:sync', { t0: Date.now() });
       // On reconnect, rejoin match if one was in progress
       const snap = this.engine.getSnapshot();
       if (snap.screen === 's-match' && snap.matchMode === 'online' && snap.matchId) {

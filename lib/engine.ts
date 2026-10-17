@@ -63,6 +63,8 @@ export interface GameState {
   tag: string;
   bonusCard: boolean;
   words: WordView[];
+  visibleCount: number;
+  buzzedAtWord: number;
   answer: string | null;
   stamp: { key: number; text: string; team: Team } | null;
   status: string;
@@ -150,7 +152,7 @@ const initial = (): GameState => ({
   hydrated: false, screen: 's-title', muted: false,
   you: null, rival: null, mode: 'match', pending: null, pickKey: 0, boardKey: 0,
   total: ROUNDS, qi: 0, scoreYou: 0, scoreRival: 0, took: [], dayLabel: '',
-  tag: '', bonusCard: false, words: [], answer: null, stamp: null, status: '',
+  tag: '', bonusCard: false, words: [], visibleCount: 0, buzzedAtWord: -1, answer: null, stamp: null, status: '',
   zone: 'buzz', buzzLive: false, window: { key: 0, secs: 0 }, ask: null, rivalView: null, seat: null, flash: null,
   result: null, resultKey: 0,
   save: defaultSave(),
@@ -200,6 +202,12 @@ export class GameEngine {
   private mySide: 'a' | 'b' = 'a';
   private findTimer: ReturnType<typeof setInterval> | null = null;
   private tutorialPaused = false;
+  /* time-based word reveal */
+  private revealStartTime = 0;
+  private revealInterval = 400;
+  private revealRafId = 0;
+  private revealFrozen = false;
+  private clockOffset = 0;
 
   /* ---------- store plumbing ---------- */
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
@@ -212,12 +220,62 @@ export class GameEngine {
   private key() { return ++this.keys; }
   /** Timers scheduled with later() die when the phase changes (cut). */
   private later(fn: () => void, ms: number) { const e = this.epoch; setTimeout(() => { if (e === this.epoch) fn(); }, ms); }
-  private cut() { this.epoch++; }
+  private cut() { this.epoch++; this.stopRevealLoop(); }
   private commit() {
     writeSave(this.save);
     const snap = { ...this.save, cats: { ...this.save.cats }, streak: { ...this.save.streak } };
     this.set({ save: snap });
     if (this.auth?.getSnapshot().status === 'authenticated') syncSave(this.auth.api, snap);
+  }
+
+  /* ---------- clock sync ---------- */
+  setClockOffset(offset: number) { this.clockOffset = offset; }
+  /** Estimated server time right now. */
+  private serverNow() { return Date.now() + this.clockOffset; }
+
+  /* ---------- rAF reveal loop ---------- */
+  private startRevealLoop() {
+    this.stopRevealLoop();
+    this.revealFrozen = false;
+    const tick = () => {
+      if (this.revealFrozen) return;
+      const elapsed = this.serverNow() - this.revealStartTime;
+      const count = elapsed < 0 ? 0 : Math.min(Math.floor(elapsed / this.revealInterval) + 1, this.all.length);
+      if (count !== this.state.visibleCount) {
+        this.set({ visibleCount: count });
+        if (count > (this.state.visibleCount || 0)) sfx.word();
+      }
+      if (count < this.all.length) {
+        this.revealRafId = requestAnimationFrame(tick);
+      } else {
+        this.revealRafId = 0;
+        this.full = true;
+      }
+    };
+    this.revealRafId = requestAnimationFrame(tick);
+  }
+
+  private stopRevealLoop() {
+    if (this.revealRafId) { cancelAnimationFrame(this.revealRafId); this.revealRafId = 0; }
+  }
+
+  private freezeReveal() {
+    this.revealFrozen = true;
+    this.stopRevealLoop();
+  }
+
+  /** After answer settles, show remaining words quickly at 50% opacity. */
+  private showRestFaded() {
+    const current = this.state.visibleCount;
+    if (current >= this.all.length) return;
+    const rest = this.all.slice(current);
+    const existingWords = this.state.words;
+    const newWords = [...existingWords];
+    for (let i = 0; i < rest.length; i++) {
+      const idx = current + i;
+      newWords[idx] = { text: rest[i], late: true, delay: i * 70 };
+    }
+    this.set({ words: newWords, visibleCount: this.all.length, buzzedAtWord: current });
   }
 
   /* ---------- small view helpers ---------- */
@@ -242,10 +300,7 @@ export class GameEngine {
   private took(v: Took) { const t = this.state.took.slice(); t[this.state.qi] = v; this.set({ took: t }); }
   private addWord(text: string, late = false, delay?: number) { this.set({ words: [...this.state.words, { text, late, delay }] }); }
   private fillRest() {
-    if (this.ri >= this.all.length) return;
-    const rest = this.all.slice(this.ri).map(text => ({ text, late: true }));
-    this.ri = this.all.length;
-    this.set({ words: [...this.state.words, ...rest] });
+    this.showRestFaded();
   }
   private showAnswer(qa: QA) { this.set({ answer: qa.o[0] }); }
   private rivalPanel(small: string, big: string | null = null, mark: RivalView['mark'] = '') {
@@ -430,7 +485,7 @@ export class GameEngine {
     this.marks = [];
     this.set({
       boardKey: this.key(), mode, rival, total, qi: 0, scoreYou: 0, scoreRival: 0, took: [],
-      tag: '', bonusCard: false, words: [], answer: null, stamp: null, status: '',
+      tag: '', bonusCard: false, words: [], visibleCount: 0, buzzedAtWord: -1, answer: null, stamp: null, status: '',
       zone: 'buzz', buzzLive: false, ask: null, rivalView: null, seat: null,
     });
   }
@@ -878,46 +933,52 @@ export class GameEngine {
     if (data.seconds <= 1) this.later(() => this.set({ screen: 's-match' }), 900);
   }
 
-  onlineNewQuestion(data: { round: number; total: number; category: string }) {
+  onlineNewQuestion(data: { round: number; total: number; category: string; words: string[]; revealStartTime: number; wordIntervalMs: number }) {
     this.cut();
+    this.stopRevealLoop();
     this.phase = 'reading';
-    this.all = [];
+    this.all = data.words || [];
     this.ri = 0;
     this.full = false;
     this.early = false;
     this.heard = 1;
     this.rivalPlan = null;
+    this.revealStartTime = data.revealStartTime;
+    this.revealInterval = data.wordIntervalMs || 400;
+
+    // All words in DOM from the start, visibility controlled by visibleCount
+    const wordViews: WordView[] = this.all.map(text => ({ text, late: false }));
+
     this.set({
       screen: 's-match', qi: data.round - 1, total: data.total, boardKey: data.round === 1 ? this.key() : this.state.boardKey,
       scoreYou: data.round === 1 ? 0 : this.state.scoreYou, scoreRival: data.round === 1 ? 0 : this.state.scoreRival,
       took: data.round === 1 ? [] : this.state.took,
-      tag: data.category, bonusCard: false, words: [], answer: null, stamp: null,
+      tag: data.category, bonusCard: false, words: wordViews, visibleCount: 0, buzzedAtWord: -1, answer: null, stamp: null,
       zone: 'buzz', buzzLive: true, ask: null, rivalView: null,
       window: { key: this.key(), secs: 0 },
       status: `Toss-up ${data.round} of ${data.total}. Buzz as soon as you know it.`,
     });
-  }
 
-  onlineWord(data: { word: string; index: number; total: number }) {
-    if (!data.word) return;
-    this.all[data.index] = data.word;
-    this.ri = data.index + 1;
-    this.addWord(data.word);
-    sfx.word();
-    this.full = data.index >= data.total - 1;
+    // Start the rAF reveal loop
+    this.startRevealLoop();
   }
 
   onlineBuzzOpen(data: { duration_ms: number }) {
+    this.stopRevealLoop();
+    this.full = true;
     this.phase = 'open';
+    this.set({ visibleCount: this.all.length });
     this.meter(data.duration_ms / 1000);
     this.status('That\u2019s the whole question. Buzz now for 10.');
   }
 
   onlineBuzzed(data: { side: string; username: string }) {
     this.cut();
+    this.freezeReveal();
     const isMe = data.side === this.mySide;
     this.early = !this.full;
-    if (isMe) this.heard = this.ri / Math.max(this.all.length, 1);
+    const buzzedAt = this.state.visibleCount;
+    if (isMe) this.heard = buzzedAt / Math.max(this.all.length, 1);
     this.phase = isMe ? 'answer' : 'rival';
     const team: Team = isMe ? 'you' : 'rival';
     if (isMe) sfx.buzz(); else sfx.rbuzz();
@@ -925,7 +986,7 @@ export class GameEngine {
     this.stamp(data.username + ' buzzed', team);
     this.seat(team);
     this.set({
-      buzzLive: false, window: { key: this.key(), secs: 0 },
+      buzzLive: false, buzzedAtWord: buzzedAt, window: { key: this.key(), secs: 0 },
       status: isMe
         ? (this.early ? 'Early buzz. 15 if you\u2019re right, \u22125 if not.' : 'Your buzzer. 10 points if you\u2019re right.')
         : `${data.username} buzzed${this.early ? ' early' : ''}.`,
@@ -966,11 +1027,8 @@ export class GameEngine {
         ask: { ...view, paused: true, options: view.options.map(o => ({ ...o, disabled: true, mark: o.text === data.correct_answer ? 'right' as const : o.mark })) },
       });
     }
-    // Merge remaining words that were never sent during reading (early buzz)
-    if (data.remaining_words?.length) {
-      for (const w of data.remaining_words) this.all.push(w);
-    }
-    this.fillRest();
+    // Show remaining words at 50% opacity with 70ms stagger
+    this.showRestFaded();
     this.set({ answer: data.correct_answer });
     if (data.correct && this.phase === 'answer') {
       sfx.right(); this.cheer(46);
@@ -992,13 +1050,16 @@ export class GameEngine {
 
   onlineBonus(data: { text: string; options: string[]; seconds: number; for_side: string }) {
     this.cut();
+    this.stopRevealLoop();
     this.phase = 'bonus';
     const forMe = data.for_side === this.mySide;
     const name = forMe ? (this.state.you?.short ?? 'You') : (this.state.opponentName ?? 'Opponent');
     const bonusWords = (data.text || '').trim().replace(/\s+/g, ' ').split(' ').filter(w => w.length > 0);
+    this.all = bonusWords;
     this.set({
       bonusCard: true, tag: 'Bonus for ' + name, answer: null,
       words: bonusWords.map((text, i) => ({ text, late: false, delay: i * 25 })),
+      visibleCount: bonusWords.length, buzzedAtWord: -1,
     });
     if (forMe) {
       this.set({ zone: 'none', ask: null, rivalView: null, status: 'Bonus question. 10 points, no buzzer.' });
