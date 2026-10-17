@@ -31,6 +31,17 @@ export class AuthClient {
 
   constructor() {
     this.api = createApi(() => this.accessToken, () => this.doRefresh());
+    // When tab becomes visible again, check if token needs refreshing
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && this.accessToken && this.state.status === 'authenticated') {
+          const exp = decodeJwtExp(this.accessToken);
+          if (exp && exp * 1000 - Date.now() < 120_000) {
+            this.doRefresh().catch(() => this.retryRefresh(1));
+          }
+        }
+      });
+    }
   }
 
   /* ---------- store plumbing ---------- */
@@ -54,18 +65,18 @@ export class AuthClient {
       return;
     }
 
-    // Try to use the stored access token to refresh
+    // Try to refresh — server accepts expired JWTs on the refresh endpoint,
+    // so this works even if the stored access token has expired.
     if (storedToken) {
       this.accessToken = storedToken;
       try {
         await this.doRefresh();
         return; // success — doRefresh set state to authenticated
       } catch {
-        // token expired or invalid — fall through
+        // refresh token revoked or network failure — guest
       }
     }
 
-    // Can't refresh without a valid access token — guest
     this.accessToken = null;
     this.clearStorage(TOKEN_KEY);
     this.clearStorage(REFRESH_KEY);
@@ -163,11 +174,9 @@ export class AuthClient {
   }
 
   private retryRefresh(attempt: number) {
-    if (attempt > 3) {
-      this.logout();
-      return;
-    }
-    const delay = Math.min(1000 * Math.pow(2, attempt), 30_000);
+    // Keep retrying indefinitely with capped backoff — never force logout
+    // from transient network issues. Cap at 60s between retries.
+    const delay = Math.min(1000 * Math.pow(2, attempt), 60_000);
     this.refreshTimer = setTimeout(() => {
       this.doRefresh().catch(() => this.retryRefresh(attempt + 1));
     }, delay);
