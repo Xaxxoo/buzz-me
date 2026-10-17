@@ -23,6 +23,7 @@ export interface ClientToServerEvents {
   'challenge:start': (data: { challenge_id: string }) => void;
   'spectate:join': (data: { match_id: string }) => void;
   'spectate:leave': (data: { match_id: string }) => void;
+  'time:sync': (data: { t0: number }) => void;
 }
 
 export interface OpponentInfo {
@@ -46,10 +47,10 @@ export interface MatchEndData {
 
 /** Server→Client events */
 export interface ServerToClientEvents {
+  'time:sync_reply': (data: { t0: number; t1: number }) => void;
   'match:found': (data: { match_id: string; opponent: OpponentInfo; you_side: string }) => void;
   'match:countdown': (data: { seconds: number }) => void;
-  'match:question': (data: { round: number; total: number; category: string }) => void;
-  'match:word': (data: { word: string; index: number; total: number }) => void;
+  'match:question': (data: { round: number; total: number; category: string; words: string[]; revealStartTime: number; wordIntervalMs: number }) => void;
   'match:buzz_open': (data: { duration_ms: number }) => void;
   'match:buzzed': (data: { side: string; username: string }) => void;
   'match:ask': (data: { options: string[]; seconds: number; struck?: string }) => void;

@@ -8,6 +8,12 @@ export const BONUS_WINDOW_S = 8;
 export const WORD_BASE_DELAY_MS = 150;
 export const WORD_CHAR_DELAY_MS = 22;
 export const PUNCTUATION_PAUSE_MS = 240;
+/** Fixed interval between words for the time-based reveal (clients compute visibility from clock). */
+export const WORD_INTERVAL_MS = 400;
+/** Faster interval for the final question. */
+export const WORD_INTERVAL_FINAL_MS = 290;
+/** Delay before the first word appears after the question event. */
+export const WORD_REVEAL_DELAY_MS = 800;
 export const ELO_K_FACTOR = 32;
 export const STARTING_RATING = 1000;
 export const RECONNECT_WINDOW_MS = 30_000;
