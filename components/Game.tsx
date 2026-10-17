@@ -375,7 +375,7 @@ export default function Game({ joinCode }: { joinCode?: string } = {}) {
           } : undefined}
         />
         <Versus active={s.screen === 's-vs'} you={s.you} rival={s.rival} />
-        <Match active={s.screen === 's-match'} s={s} boardKey={String(s.boardKey)} onBuzz={onBuzz} onAnswer={onAnswer} onAcceptBot={onAcceptBot} onDismissBot={onDismissBot} onCancelFind={onCancelFind} onJoinPrivate={(code) => { engine.joinPrivateMatch(); socket.joinPrivateMatch(code); }} onCancelPrivate={onCancelPrivate} onTutorialNext={() => engine.tutorialNext()} />
+        <Match active={s.screen === 's-match'} s={s} boardKey={String(s.boardKey)} onBuzz={onBuzz} onAnswer={onAnswer} onAcceptBot={onAcceptBot} onDismissBot={onDismissBot} onCancelFind={onCancelFind} onJoinPrivate={(code) => { engine.joinPrivateMatch(); socket.joinPrivateMatch(code); }} onCancelPrivate={onCancelPrivate} />
         <Result
           active={s.screen === 's-result'} result={s.result} resultKey={s.resultKey}
           authStatus={authState.status}

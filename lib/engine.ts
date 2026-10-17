@@ -3,7 +3,7 @@ import { type DbQuestion, mapQuestion } from './api';
 import { DAILY, OPEN_MS, ROUNDS } from './config';
 import { confetti } from './confetti';
 import {
-  bumpStreak, defaultSave, isTutorialDone, liveStreak, loadSave, loadServerSave, markTutorialDone, nextIn, niceDate, record, syncSave, today, writeSave,
+  bumpStreak, defaultSave, liveStreak, loadSave, loadServerSave, nextIn, niceDate, record, syncSave, today, writeSave,
   type Mark, type Save,
 } from './save';
 import { pickRival, school } from './schools';
@@ -123,9 +123,6 @@ export interface GameState {
   /* question loading */
   questionsLoading: boolean;
   questionsError: string | null;
-  /* tutorial */
-  tutorialStep: number;
-  tutorialTip: string;
   /* invite link */
   pendingJoinCode: string | null;
 }
@@ -139,12 +136,6 @@ const shuffle = <T,>(src: T[]): T[] => {
 };
 const calm = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const TUTORIAL_Q: Question = {
-  t: 'What is the name of the largest ocean on Earth?',
-  c: 'Geography',
-  o: ['Pacific Ocean', 'Atlantic Ocean', 'Indian Ocean', 'Arctic Ocean'],
-  b: { t: 'What is the capital city of Japan?', o: ['Tokyo', 'Osaka', 'Kyoto', 'Nagoya'] },
-};
 const pct = (n: number | null) => (n == null ? 'None' : Math.round(n * 100) + '% in');
 export const num = (n: number) => (n < 0 ? '−' : '') + Math.abs(Math.round(n));
 
@@ -170,8 +161,6 @@ const initial = (): GameState => ({
   reconnecting: false,
   questionsLoading: false,
   questionsError: null,
-  tutorialStep: 0,
-  tutorialTip: '',
   pendingJoinCode: null,
 });
 
@@ -201,7 +190,6 @@ export class GameEngine {
   private asking: { qa: QA; done: (ok: boolean, text: string | null) => void; over: boolean } | null = null;
   private mySide: 'a' | 'b' = 'a';
   private findTimer: ReturnType<typeof setInterval> | null = null;
-  private tutorialPaused = false;
   /* time-based word reveal */
   private revealStartTime = 0;
   private revealInterval = 400;
@@ -513,8 +501,7 @@ export class GameEngine {
     sfx.slam(); setTimeout(() => sfx.slam(), 180);
     this.later(() => {
       this.set({ screen: 's-match' });
-      if (this.shouldTutorial()) this.startTutorial();
-      else this.nextQuestion();
+      this.nextQuestion();
     }, calm() ? 1400 : 2600);
   }
 
@@ -560,29 +547,22 @@ export class GameEngine {
         ? `Question ${qi + 1} of ${this.qs.length}. The earlier you buzz, the more it's worth.`
         : `Toss-up ${qi + 1} of ${this.qs.length}. Buzz as soon as you know it.`,
     });
-    /* The rival decides whether to buzz, based on difficulty. Suppressed during tutorial. */
+    /* The rival decides whether to buzz, based on difficulty. */
     const bp = this.botParams();
     const at = rand(bp.speedMin, bp.speedMax);
-    this.rivalPlan = daily || this.state.tutorialStep > 0 || Math.random() >= bp.buzzChance ? null
+    this.rivalPlan = daily || Math.random() >= bp.buzzChance ? null
       : { idx: at <= 1 ? Math.max(6, Math.ceil(at * this.all.length)) : Infinity, late: at > 1 ? 500 + ((at - 1) / (bp.speedMax - 1)) * 3400 : null };
     this.later(() => this.readTick(), 800);
   }
 
   /** Reveals the next word of the question. */
   private readTick() {
-    if (this.tutorialPaused) return;
     if (this.ri >= this.all.length) { this.full = true; this.openWindow(); return; }
     const w = this.all[this.ri++];
     if (!w) { this.later(() => this.readTick(), 50); return; }
     this.addWord(w);
     sfx.word();
     this.full = this.ri >= this.all.length;
-    /* tutorial step 1: pause after 3 words */
-    if (this.state.tutorialStep === 1 && this.ri >= 3) {
-      this.tutorialPaused = true;
-      this.set({ tutorialTip: 'The question is being read out. Wait for the buzzer to light up.' });
-      return;
-    }
     if (this.rivalPlan && this.ri >= this.rivalPlan.idx) return this.later(() => this.rivalBuzz(), 200);
     if (this.full) return this.openWindow();
     this.later(() => this.readTick(), 150 + w.length * 22 + (/[,.]$/.test(w) ? 240 : 0));
@@ -592,10 +572,6 @@ export class GameEngine {
     this.phase = 'open';
     this.meter(OPEN_MS / 1000);
     this.status(`That\u2019s the whole question. Buzz now for 10.`);
-    /* tutorial step 2: prompt the player to buzz */
-    if (this.state.tutorialStep === 2) {
-      this.set({ tutorialTip: 'The buzzer is live! Press it now to claim the question.' });
-    }
     if (this.rivalPlan && this.rivalPlan.late != null) this.later(() => this.rivalBuzz(), this.rivalPlan.late);
     this.later(() => {
       this.cut();
@@ -628,12 +604,7 @@ export class GameEngine {
         ? `Buzzed ${Math.round(this.heard * 100)}% in. Worth ${10 + Math.round((1 - this.heard) * 10)} if you're right` + (this.early ? ', −5 if not.' : '.')
         : this.early ? `Early buzz. 15 if you\u2019re right, \u22125 if not.` : `Your buzzer. 10 points if you\u2019re right.`,
     });
-    if (this.state.tutorialStep === 2 || this.state.tutorialStep === 3) {
-      this.set({ tutorialStep: 3, tutorialTip: 'Pick the right answer. 10 points if correct, 15 if you buzzed before the question ended.' });
-      this.later(() => this.ask(this.q!, { secs: 6, done: this.tutorialAnswerDone }), 700);
-    } else {
-      this.later(() => this.ask(this.q!, { secs: 6, done: daily ? this.dailyAnswer : this.tossResult }), 700);
-    }
+    this.later(() => this.ask(this.q!, { secs: 6, done: daily ? this.dailyAnswer : this.tossResult }), 700);
   }
 
   private tossResult = (ok: boolean, text: string | null) => {
@@ -751,56 +722,6 @@ export class GameEngine {
         this.later(() => this.advance(), 2000);
       }, 1800);
     }
-  }
-
-  /* ---------- tutorial ---------- */
-  private shouldTutorial() { return this.save.played === 0 && !isTutorialDone(); }
-
-  private startTutorial() {
-    /* replace question 0 with the tutorial question */
-    this.qs[0] = TUTORIAL_Q;
-    this.set({ tutorialStep: 1, tutorialTip: '' });
-    this.nextQuestion();
-  }
-
-  private tutorialAnswerDone = (ok: boolean, text: string | null) => {
-    const q = this.q!;
-    record(this.save, q.c, ok); this.commit();
-    if (ok) {
-      const pts = this.early ? 15 : 10;
-      this.score('you', pts); this.took('you'); this.tally.won++;
-      if (this.early) this.tally.best = Math.min(this.tally.best ?? 1, this.heard);
-      sfx.right(); this.cheer(46);
-      this.fillRest(); this.showAnswer(q);
-      this.set({
-        tutorialStep: 4,
-        tutorialTip: 'Nice! In a real match, a wrong answer loses 5 points and gives the rival a chance to steal.',
-      });
-    } else {
-      if (this.early) this.score('you', -5);
-      sfx.wrong();
-      this.fillRest(); this.showAnswer(q);
-      this.set({
-        tutorialStep: 4,
-        tutorialTip: 'Wrong answer! In a real match, that\u2019s \u22125 and the rival can steal.',
-      });
-    }
-  };
-
-  tutorialNext() {
-    const step = this.state.tutorialStep;
-    if (step === 1) {
-      /* resume reading */
-      this.tutorialPaused = false;
-      this.set({ tutorialStep: 2, tutorialTip: '' });
-      this.later(() => this.readTick(), 150);
-    } else if (step === 4) {
-      /* tutorial complete — proceed to normal match */
-      markTutorialDone();
-      this.set({ tutorialStep: 0, tutorialTip: '' });
-      this.advance();
-    }
-    /* steps 2 and 3 don't need "Got it" — the player interacts with the buzzer / options naturally */
   }
 
   /* ---------- daily challenge ---------- */

@@ -100,15 +100,6 @@ export function bumpStreak(s: Save) {
   return froze;
 }
 
-/* ---------- tutorial flag ---------- */
-const TUTORIAL_KEY = 'quad.tutorial_done';
-export function isTutorialDone(): boolean {
-  try { return localStorage.getItem(TUTORIAL_KEY) === '1'; } catch { return false; }
-}
-export function markTutorialDone(): void {
-  try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch { /* private window */ }
-}
-
 export function record(s: Save, cat: string, ok: boolean) {
   const c = s.cats[cat] || (s.cats[cat] = [0, 0]);
   c[1]++;
