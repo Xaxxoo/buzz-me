@@ -101,7 +101,7 @@ export function Match({ active, s, boardKey, onBuzz, onAnswer, onAcceptBot, onDi
   const teamColor = (t: Team) => (t === 'you' ? s.you?.a : s.rival?.a) ?? '#1B1464';
 
   /* keep the newest word in view on small screens */
-  useEffect(() => { const el = qtext.current; if (el) el.scrollTop = el.scrollHeight; }, [s.words.length]);
+  useEffect(() => { const el = qtext.current; if (el) el.scrollTop = el.scrollHeight; }, [s.visibleCount]);
 
   return (
     <section className="screen match enter flex-auto min-h-0 flex flex-col gap-3" id="s-match" hidden={!active}>
@@ -127,9 +127,11 @@ export function Match({ active, s, boardKey, onBuzz, onAnswer, onAcceptBot, onDi
       <article className={'card' + (s.bonusCard ? ' bonus' : '')} id="card">
         <span className="tag" id="tag">{s.tag}</span>
         <p className="qtext" id="qtext" ref={qtext}>
-          {s.words.map((w, i) => (
-            <span key={`${cardKey}-${i}`} className={'w' + (w.late ? ' late' : '')} style={w.delay ? { animationDelay: w.delay + 'ms' } : undefined}>{w.text}</span>
-          ))}
+          {s.words.map((w, i) => {
+            const pending = i >= s.visibleCount && !w.late;
+            const cls = 'w' + (w.late ? ' late' : '') + (pending ? ' pending' : '');
+            return <span key={`${cardKey}-${i}`} className={cls} style={w.delay ? { animationDelay: w.delay + 'ms' } : undefined}>{w.text}</span>;
+          })}
         </p>
         {s.answer && <p className="answer" id="answer">Answer: {s.answer}</p>}
         {s.stamp && <div key={s.stamp.key} className="stamp" id="stamp" style={{ '--c': teamColor(s.stamp.team) } as CSSProperties}>{s.stamp.text}</div>}
