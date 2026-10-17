@@ -86,6 +86,14 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.gameService.handleDisconnect(user.id);
   }
 
+  @SubscribeMessage('time:sync')
+  handleTimeSync(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { t0: number },
+  ) {
+    client.emit('time:sync_reply' as any, { t0: data?.t0 ?? 0, t1: Date.now() });
+  }
+
   @SubscribeMessage('match:solo')
   async handleSoloMatch(
     @ConnectedSocket() client: Socket,

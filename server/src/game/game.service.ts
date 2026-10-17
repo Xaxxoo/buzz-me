@@ -15,7 +15,7 @@ import { MatchParticipant } from '../entities/match-participant.entity';
 import { Round } from '../entities/round.entity';
 import {
   ROUNDS, BUZZ_WINDOW_MS, ANSWER_WINDOW_S, BONUS_WINDOW_S,
-  WORD_BASE_DELAY_MS, WORD_CHAR_DELAY_MS, PUNCTUATION_PAUSE_MS,
+  WORD_INTERVAL_MS, WORD_INTERVAL_FINAL_MS, WORD_REVEAL_DELAY_MS,
   MIN_BUZZ_TIME_MS, RECONNECT_WINDOW_MS,
 } from '../config/game.config';
 
@@ -824,13 +824,25 @@ export class GameService {
       return;
     }
 
+    const isFinal = room.currentRound === room.questions.length - 1;
+    const interval = isFinal ? WORD_INTERVAL_FINAL_MS : WORD_INTERVAL_MS;
+    const revealStartTime = Date.now() + WORD_REVEAL_DELAY_MS;
+
+    (room as any)._revealStartTime = revealStartTime;
+    (room as any)._wordInterval = interval;
+
     this.emitToRoom(room, 'match:question', {
       round: room.currentRound + 1,
       total: room.questions.length,
       category: q.categoryName,
+      words: q.words,
+      revealStartTime,
+      wordIntervalMs: interval,
     });
 
-    this.scheduleTimer(room, () => this.readNextWord(room), 800);
+    // Schedule buzz window to open after all words have been revealed
+    const totalRevealMs = WORD_REVEAL_DELAY_MS + q.words.length * interval;
+    this.scheduleTimer(room, () => this.openBuzzWindow(room), totalRevealMs);
 
     // Bot planning for solo matches
     if (isBot(room.playerB)) {
@@ -838,47 +850,22 @@ export class GameService {
     }
   }
 
-  private readNextWord(room: GameRoom) {
-    if (room.phase !== 'reading') return;
+  /** Calculate how many words have been revealed based on elapsed time. */
+  private currentWordIndex(room: GameRoom): number {
+    const startTime = (room as any)._revealStartTime as number | undefined;
+    const interval = (room as any)._wordInterval as number | undefined;
+    if (!startTime || !interval) return 0;
+    const elapsed = Date.now() - startTime;
+    if (elapsed < 0) return 0;
     const q = room.questions[room.currentRound];
-    if (!q || room.wordIndex >= q.words.length) {
-      return this.openBuzzWindow(room);
-    }
-
-    const word = q.words[room.wordIndex];
-    this.emitToRoom(room, 'match:word', {
-      word,
-      index: room.wordIndex,
-      total: q.words.length,
-    });
-    room.wordIndex++;
-
-    // Check if bot should buzz now
-    if (isBot(room.playerB) && room.phase === 'reading') {
-      const botPlan = (room as any)._botBuzzAt;
-      if (botPlan !== undefined && room.wordIndex >= botPlan) {
-        this.scheduleTimer(room, () => this.botBuzz(room), 200);
-        return;
-      }
-    }
-
-    if (room.wordIndex >= q.words.length) {
-      this.scheduleTimer(room, () => this.openBuzzWindow(room), WORD_BASE_DELAY_MS + word.length * WORD_CHAR_DELAY_MS);
-    } else {
-      const delay = WORD_BASE_DELAY_MS + word.length * WORD_CHAR_DELAY_MS + (/[,.]$/.test(word) ? PUNCTUATION_PAUSE_MS : 0);
-      this.scheduleTimer(room, () => this.readNextWord(room), delay);
-    }
+    return Math.min(Math.floor(elapsed / interval) + 1, q?.words?.length ?? 0);
   }
 
   private openBuzzWindow(room: GameRoom) {
     room.phase = 'buzz_open';
     room.buzzOpenAt = Date.now();
+    room.wordIndex = room.questions[room.currentRound]?.words?.length ?? 0;
     this.emitToRoom(room, 'match:buzz_open', { duration_ms: BUZZ_WINDOW_MS });
-
-    // Bot late buzz
-    if (isBot(room.playerB) && (room as any)._botLateBuzz) {
-      this.scheduleTimer(room, () => this.botBuzz(room), (room as any)._botLateBuzz);
-    }
 
     this.scheduleTimer(room, () => {
       this.bumpEpoch(room);
@@ -909,6 +896,7 @@ export class GameService {
     this.bumpEpoch(room);
     room.buzzedSide = side;
     room.buzzedEarly = room.phase === 'reading';
+    room.wordIndex = this.currentWordIndex(room);
     room.phase = 'answering';
 
     const buzzer = side === 'a' ? room.playerA : room.playerB;
@@ -1426,11 +1414,10 @@ export class GameService {
   private planBotBuzz(room: GameRoom) {
     const q = room.questions[room.currentRound];
     const bot = room.playerB as BotSlot;
+    const interval = (room as any)._wordInterval as number || WORD_INTERVAL_MS;
 
     // 72% chance bot knows the answer (matches frontend)
     if (Math.random() >= 0.72) {
-      (room as any)._botBuzzAt = undefined;
-      (room as any)._botLateBuzz = undefined;
       return;
     }
 
@@ -1438,11 +1425,15 @@ export class GameService {
     const at = (0.6 + Math.random() * 0.62) * diffMult;
 
     if (at <= 1) {
-      (room as any)._botBuzzAt = Math.max(6, Math.ceil(at * q.words.length));
-      (room as any)._botLateBuzz = undefined;
+      // Bot buzzes during reveal — schedule based on word timing
+      const wordTarget = Math.max(6, Math.ceil(at * q.words.length));
+      const buzzDelayMs = WORD_REVEAL_DELAY_MS + wordTarget * interval + 200;
+      this.scheduleTimer(room, () => this.botBuzz(room), buzzDelayMs);
     } else {
-      (room as any)._botBuzzAt = undefined;
-      (room as any)._botLateBuzz = 500 + ((at - 1) / 0.22) * 3400;
+      // Bot buzzes after full reveal — late buzz
+      const totalRevealMs = WORD_REVEAL_DELAY_MS + q.words.length * interval;
+      const lateBuzzMs = totalRevealMs + 500 + ((at - 1) / 0.22) * 3400;
+      this.scheduleTimer(room, () => this.botBuzz(room), lateBuzzMs);
     }
   }
 
@@ -1453,6 +1444,7 @@ export class GameService {
     this.bumpEpoch(room);
     room.buzzedSide = 'b';
     room.buzzedEarly = room.phase === 'reading';
+    room.wordIndex = this.currentWordIndex(room);
     room.phase = 'answering';
 
     this.emitToRoom(room, 'match:buzzed', { side: 'b', username: 'Bot' });
