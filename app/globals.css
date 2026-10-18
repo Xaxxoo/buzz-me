@@ -667,8 +667,9 @@
 
   /* --- Content area --- */
   .admin-content {
-    flex: 1; margin-left: 256px; min-height: 100vh;
+    margin-left: 256px; height: 100vh; height: 100dvh;
     display: flex; flex-direction: column;
+    overflow-y: auto;
     transition: margin-left 220ms cubic-bezier(.4,0,.2,1);
   }
   .admin-shell.collapsed .admin-content { margin-left: 68px; }
@@ -982,8 +983,7 @@
   .admin-session-meta { display: flex; gap: 14px; font: 400 12px var(--font-body); color: var(--color-muted); }
 }
 
-/* Must use !important to beat Tailwind's overflow-hidden utility on <body> */
-html:has(.admin-shell), body:has(.admin-shell) { height: auto !important; overflow: auto !important; }
+/* Admin content area is the scroll container — no body override needed */
 
 /* --- Responsive --- */
 @media (max-width: 768px) {
