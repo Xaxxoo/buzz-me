@@ -34,9 +34,10 @@ function SkeletonRows({ cols, rows = 5 }: { cols: number; rows?: number }) {
 export default function DataTable<T extends { id: string }>({
   columns, data, total, page, limit, onPageChange, onRowClick, loading,
 }: Props<T>) {
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const t = Number(total) || 0;
+  const totalPages = Math.max(1, Math.ceil(t / limit));
   const start = (page - 1) * limit + 1;
-  const end = Math.min(page * limit, total);
+  const end = Math.min(page * limit, t);
 
   return (
     <div className="admin-table-wrap">
@@ -75,16 +76,16 @@ export default function DataTable<T extends { id: string }>({
           ))}
         </tbody>
       </table>
-      {totalPages > 1 && (
-        <div className="admin-table-footer">
-          <span>{total > 0 ? `${start}\u2013${end} of ${total.toLocaleString()}` : '\u00A0'}</span>
+      <div className="admin-table-footer">
+        <span>{t > 0 ? `${start}\u2013${end} of ${t.toLocaleString()}` : '\u00A0'}</span>
+        {totalPages > 1 && (
           <div className="admin-pagination">
             <button disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Prev</button>
             <span>Page {page} of {totalPages}</span>
             <button disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
