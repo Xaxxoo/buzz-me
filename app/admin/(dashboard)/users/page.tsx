@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { adminApi } from '@/lib/admin-auth';
 import type { AdminUser, Paginated } from '@/lib/admin-api';
 import DataTable from '@/components/admin/DataTable';
 
 export default function AdminUsers() {
+  const router = useRouter();
   const [data, setData] = useState<Paginated<AdminUser> | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -36,6 +38,7 @@ export default function AdminUsers() {
       </form>
       {data && (
         <DataTable<AdminUser>
+          onRowClick={u => router.push(`/admin/users/${u.id}`)}
           columns={[
             { key: 'username', label: 'Username' },
             { key: 'email', label: 'Email' },

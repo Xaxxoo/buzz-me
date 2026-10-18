@@ -952,6 +952,34 @@
     transition: width 600ms cubic-bezier(.4,0,.2,1);
   }
   .admin-bar-value { width: 36px; text-align: right; font: 600 12px var(--font-body); color: rgba(255,255,255,0.6); flex-shrink: 0; }
+
+  /* --- User detail page --- */
+  .admin-user-header { display: flex; flex-direction: column; gap: 14px; }
+  .admin-user-header-info { display: flex; flex-direction: column; gap: 4px; }
+  .admin-user-header-top { display: flex; align-items: center; gap: 10px; }
+  .admin-user-header-name { font: 700 22px/1 var(--font-display); color: var(--color-ink); letter-spacing: -.03em; margin: 0; }
+  .admin-user-header-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font: 400 13px var(--font-body); color: var(--color-muted); }
+  .admin-user-header-meta .admin-badge { font-size: 11px; }
+
+  .admin-stat-bar {
+    height: 100%; border-radius: 100px; min-width: 2px;
+    background: linear-gradient(90deg, rgba(198,244,50,0.5), rgba(198,244,50,0.8));
+    transition: width 600ms cubic-bezier(.4,0,.2,1);
+  }
+
+  .admin-rating-delta { font: 600 12px var(--font-body); padding: 2px 8px; border-radius: 6px; }
+  .admin-rating-delta.pos { background: rgba(52,211,153,0.1); color: #34d399; }
+  .admin-rating-delta.neg { background: rgba(239,68,68,0.1); color: #f87171; }
+
+  .admin-result-badge { font: 700 11px var(--font-body); padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .admin-result-badge.win { background: rgba(52,211,153,0.1); color: #34d399; }
+  .admin-result-badge.loss { background: rgba(239,68,68,0.1); color: #f87171; }
+  .admin-result-badge.draw { background: rgba(251,191,36,0.1); color: #fbbf24; }
+
+  .admin-sessions-list { display: flex; flex-direction: column; gap: 8px; }
+  .admin-session-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); }
+  .admin-session-device { font: 500 13px var(--font-body); color: var(--color-ink); }
+  .admin-session-meta { display: flex; gap: 14px; font: 400 12px var(--font-body); color: var(--color-muted); }
 }
 
 /* Un-layered so it beats Tailwind's utility-layer overflow-hidden on <body> */

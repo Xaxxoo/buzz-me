@@ -35,6 +35,11 @@ export class AdminController {
     );
   }
 
+  @Get('users/:id/stats')
+  getUserStats(@Param('id') id: string) {
+    return this.service.getUserStats(id);
+  }
+
   @Get('users/:id')
   getUser(@Param('id') id: string) {
     return this.service.getUser(id);

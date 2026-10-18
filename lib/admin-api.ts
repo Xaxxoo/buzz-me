@@ -135,6 +135,45 @@ export interface AdminCampusLandmark {
   created_at: string;
 }
 
+export interface AdminUserStatsResponse {
+  user: Omit<AdminUser, 'matches_played' | 'matches_won' | 'matches_lost' | 'matches_drawn'> & {
+    updated_at: string;
+    category_stats: Record<string, [number, number]>;
+    sessions: { id: string; device_name: string; last_seen: string; created_at: string }[];
+    save_data: Record<string, any> | null;
+    matches_played: number;
+    matches_won: number;
+    matches_lost: number;
+    matches_drawn: number;
+  };
+  stats: {
+    totalTimePlayed: number;
+    avgMatchDuration: number;
+    totalRounds: number;
+    correctAnswers: number;
+    totalAnswers: number;
+    accuracy: number;
+    avgBuzzSpeed: number | null;
+    avgBuzzPosition: number | null;
+    totalPointsScored: number;
+    avgScore: number;
+    reboundsAttempted: number;
+    reboundsCorrect: number;
+    winStreak: number;
+    bestWinStreak: number;
+  };
+  categories: { slug: string; name: string; correct: number; total: number; accuracy: number }[];
+  ratingHistory: { match_id: string; date: string; rating_before: number; rating_after: number; delta: number }[];
+  recentMatches: {
+    id: string; type: string; status: string; score: number;
+    opponentName: string | null; opponentScore: number | null;
+    result: 'win' | 'loss' | 'draw';
+    ratingBefore: number | null; ratingAfter: number | null;
+    date: string;
+  }[];
+  sessions: { id: string; device_name: string; last_seen: string; created_at: string }[];
+}
+
 export function createAdminApi(api: Api) {
   return {
     fetchStats: () => api.get<AdminStats>('/admin/stats'),
@@ -143,6 +182,7 @@ export function createAdminApi(api: Api) {
     fetchUsers: (page = 1, limit = 20, q?: string) =>
       api.get<Paginated<AdminUser>>(`/admin/users?page=${page}&limit=${limit}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
     fetchUser: (id: string) => api.get<AdminUser>(`/admin/users/${id}`),
+    fetchUserStats: (id: string) => api.get<AdminUserStatsResponse>(`/admin/users/${id}/stats`),
     updateUser: (id: string, data: { is_admin?: boolean; university_id?: string | null }) =>
       api.patch<AdminUser>(`/admin/users/${id}`, data),
 

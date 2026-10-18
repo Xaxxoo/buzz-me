@@ -9,10 +9,13 @@ import { Question } from '../entities/question.entity';
 import { Category } from '../entities/category.entity';
 import { Report } from '../entities/report.entity';
 import { University } from '../entities/university.entity';
+import { MatchParticipant } from '../entities/match-participant.entity';
+import { Round } from '../entities/round.entity';
+import { DeviceSession } from '../entities/device-session.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Match, Question, Category, Report, University]),
+    TypeOrmModule.forFeature([User, Match, Question, Category, Report, University, MatchParticipant, Round, DeviceSession]),
     CategoriesModule,
   ],
   controllers: [AdminController],
