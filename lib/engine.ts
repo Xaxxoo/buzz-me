@@ -390,8 +390,8 @@ export class GameEngine {
   findQuickMatch() {
     this.cut();
     this.phase = 'idle';
-    this.set({ screen: 's-match', finding: true, findElapsed: 0, botOffer: false, matchMode: 'online', matchId: null, opponentName: null, status: 'Finding opponent\u2026', zone: 'none', buzzLive: false, tag: '', words: [], answer: null, bonusCard: false });
-    this.findTimer = setInterval(() => { this.set({ findElapsed: this.state.findElapsed + 1 }); }, 1000);
+    this.set({ screen: 's-match', finding: true, findElapsed: 0, botOffer: false, matchMode: 'online', matchId: null, opponentName: null, status: 'Finding opponent\u2026 0s', zone: 'none', buzzLive: false, tag: '', words: [], answer: null, bonusCard: false });
+    this.findTimer = setInterval(() => { const t = this.state.findElapsed + 1; this.set({ findElapsed: t }); this.status(`Finding opponent\u2026 ${t}s`); }, 1000);
   }
   cancelFind() {
     if (this.findTimer) { clearInterval(this.findTimer); this.findTimer = null; }
