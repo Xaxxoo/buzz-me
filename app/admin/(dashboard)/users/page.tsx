@@ -14,7 +14,7 @@ export default function AdminUsers() {
   const [searchInput, setSearchInput] = useState('');
 
   const load = useCallback((p: number, q: string) => {
-    adminApi.fetchUsers(p, 20, q || undefined).then(setData).catch(() => {});
+    adminApi.fetchUsers(p, 10, q || undefined).then(setData).catch(() => {});
   }, []);
 
   useEffect(() => { load(page, search); }, [page, search, load]);
