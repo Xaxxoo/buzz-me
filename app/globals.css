@@ -982,8 +982,8 @@
   .admin-session-meta { display: flex; gap: 14px; font: 400 12px var(--font-body); color: var(--color-muted); }
 }
 
-/* Un-layered so it beats Tailwind's utility-layer overflow-hidden on <body> */
-html:has(.admin-shell), body:has(.admin-shell) { height: auto; overflow: auto; }
+/* Must use !important to beat Tailwind's overflow-hidden utility on <body> */
+html:has(.admin-shell), body:has(.admin-shell) { height: auto !important; overflow: auto !important; }
 
 /* --- Responsive --- */
 @media (max-width: 768px) {
