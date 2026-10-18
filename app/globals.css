@@ -667,7 +667,7 @@
 
   /* --- Content area --- */
   .admin-content {
-    margin-left: 256px; height: 100vh; height: 100dvh;
+    flex: 1; margin-left: 256px; height: 100vh; height: 100dvh;
     display: flex; flex-direction: column;
     overflow-y: auto;
     transition: margin-left 220ms cubic-bezier(.4,0,.2,1);
