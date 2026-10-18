@@ -23,7 +23,7 @@ export default function AdminQuestions() {
     const filters: any = {};
     if (filterCat) filters.category_id = filterCat;
     if (filterDiff) filters.difficulty = filterDiff;
-    adminApi.fetchQuestions(p, 50, filters).then(setData).catch(() => {});
+    adminApi.fetchQuestions(p, 20, filters).then(setData).catch(() => {});
   }, [filterCat, filterDiff]);
 
   useEffect(() => {
