@@ -19,16 +19,18 @@ export class AuthController {
   signup(
     @Body() dto: SignupDto,
     @Headers('x-device-name') deviceName: string,
+    @Headers('user-agent') userAgent: string,
   ) {
-    return this.authService.signup(dto, deviceName);
+    return this.authService.signup(dto, deviceName, userAgent);
   }
 
   @Post('login')
   login(
     @Body() dto: LoginDto,
     @Headers('x-device-name') deviceName: string,
+    @Headers('user-agent') userAgent: string,
   ) {
-    return this.authService.login(dto, deviceName);
+    return this.authService.login(dto, deviceName, userAgent);
   }
 
   @Post('refresh')

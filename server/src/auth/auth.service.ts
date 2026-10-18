@@ -12,6 +12,34 @@ import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { ProfanityPipe } from '../common/pipes/profanity.pipe';
 
+function parseUserAgent(ua?: string): string {
+  if (!ua) return 'Unknown device';
+
+  let browser = 'Unknown';
+  let os = 'Unknown';
+
+  // OS detection
+  if (/iPhone|iPad|iPod/.test(ua)) os = 'iOS';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/Mac OS X/.test(ua)) os = 'macOS';
+  else if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Linux/.test(ua)) os = 'Linux';
+  else if (/CrOS/.test(ua)) os = 'Chrome OS';
+
+  // Browser detection (order matters — check specific before generic)
+  if (/Edg\//.test(ua)) browser = 'Edge';
+  else if (/OPR\/|Opera/.test(ua)) browser = 'Opera';
+  else if (/SamsungBrowser/.test(ua)) browser = 'Samsung Browser';
+  else if (/Firefox\//.test(ua)) browser = 'Firefox';
+  else if (/CriOS\//.test(ua)) browser = 'Chrome';
+  else if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) browser = 'Chrome';
+  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+
+  if (browser === 'Unknown' && os === 'Unknown') return 'Unknown device';
+  if (browser === 'Unknown') return os;
+  return `${browser} on ${os}`;
+}
+
 @Injectable()
 export class AuthService {
   private profanity = new ProfanityPipe();
@@ -22,7 +50,7 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async signup(dto: SignupDto, deviceName: string) {
+  async signup(dto: SignupDto, deviceName: string, userAgent?: string) {
     this.profanity.transform(dto.username);
 
     const existing = await this.usersRepo.findOne({
@@ -46,10 +74,10 @@ export class AuthService {
     });
     await this.usersRepo.save(user);
 
-    return this.createTokenPair(user, deviceName);
+    return this.createTokenPair(user, deviceName, userAgent);
   }
 
-  async login(dto: LoginDto, deviceName: string) {
+  async login(dto: LoginDto, deviceName: string, userAgent?: string) {
     const id = dto.identifier.toLowerCase();
     const user = id.includes('@')
       ? await this.usersRepo.findOne({ where: { email: id } })
@@ -58,7 +86,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid username/email or password');
     }
 
-    return this.createTokenPair(user, deviceName);
+    return this.createTokenPair(user, deviceName, userAgent);
   }
 
   async refresh(refreshToken: string, userId: string) {
@@ -132,14 +160,14 @@ export class AuthService {
     });
   }
 
-  private async createTokenPair(user: User, deviceName: string) {
+  private async createTokenPair(user: User, deviceName: string, userAgent?: string) {
     const accessToken = this.issueAccessToken(user);
     const refreshToken = randomBytes(32).toString('hex');
 
     const session = this.sessionsRepo.create({
       user_id: user.id,
       refresh_token_hash: await bcrypt.hash(refreshToken, 10),
-      device_name: deviceName || 'Unknown device',
+      device_name: deviceName || parseUserAgent(userAgent),
     });
     await this.sessionsRepo.save(session);
 
