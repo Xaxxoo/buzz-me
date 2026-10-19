@@ -27,6 +27,7 @@ export class AuthClient {
   private listeners = new Set<() => void>();
   private accessToken: string | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private refreshInFlight: Promise<string | null> | null = null;
   api: Api;
 
   constructor() {
@@ -60,21 +61,39 @@ export class AuthClient {
     const storedToken = this.readStorage(TOKEN_KEY);
     const refreshToken = this.readStorage(REFRESH_KEY);
 
-    if (!refreshToken) {
+    if (!refreshToken && !storedToken) {
       this.set({ status: 'guest', user: null });
       return;
     }
 
-    // Try to refresh — server accepts expired JWTs on the refresh endpoint,
-    // so this works even if the stored access token has expired.
     if (storedToken) {
       this.accessToken = storedToken;
+    }
+
+    // Try to refresh — server accepts expired JWTs on the refresh endpoint,
+    // so this works even if the stored access token has expired.
+    if (refreshToken && storedToken) {
       try {
         await this.doRefresh();
         return; // success — doRefresh set state to authenticated
       } catch {
-        // refresh token revoked or network failure — guest
+        // Refresh failed — fall through to use stored token directly.
+        // Don't wipe tokens; the refresh endpoint may just be temporarily down.
       }
+    }
+
+    // Use the stored access token directly if we have one.
+    // Decode user from it so the UI can render immediately.
+    if (this.accessToken) {
+      try {
+        const payload = JSON.parse(atob(this.accessToken.split('.')[1]));
+        this.set({
+          status: 'authenticated',
+          user: this.state.user || { id: payload.sub, username: payload.username, email: '', rating: 1000 },
+        });
+        this.scheduleRefresh();
+        return;
+      } catch { /* token is corrupt — fall through to guest */ }
     }
 
     this.accessToken = null;
@@ -120,6 +139,19 @@ export class AuthClient {
   }
 
   private async doRefresh(): Promise<string | null> {
+    // Mutex: if a refresh is already in flight, piggyback on it
+    // to avoid concurrent rotations that trigger token mismatch.
+    if (this.refreshInFlight) return this.refreshInFlight;
+
+    this.refreshInFlight = this._doRefreshInner();
+    try {
+      return await this.refreshInFlight;
+    } finally {
+      this.refreshInFlight = null;
+    }
+  }
+
+  private async _doRefreshInner(): Promise<string | null> {
     const refreshToken = this.readStorage(REFRESH_KEY);
     if (!refreshToken || !this.accessToken) return null;
 

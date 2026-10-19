@@ -101,9 +101,7 @@ export class AuthService {
     }
 
     if (!matched) {
-      // Possible token theft — revoke all sessions
-      await this.sessionsRepo.delete({ user_id: userId });
-      throw new UnauthorizedException('Refresh token invalid. All sessions revoked.');
+      throw new UnauthorizedException('Refresh token invalid');
     }
 
     const user = await this.usersRepo.findOneBy({ id: userId });
