@@ -18,6 +18,7 @@ function Icon({ name }: { name: string }) {
     case 'flag': return <svg {...I}><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>;
     case 'building': return <svg {...I}><path d="M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>;
     case 'map': return <svg {...I}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>;
+    case 'trophy': return <svg {...I}><path d="M6 9H4.5a2.5 2.5 0 010-5H6"/><path d="M18 9h1.5a2.5 2.5 0 000-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20 17 22"/><path d="M18 2H6v7a6 6 0 1012 0V2Z"/></svg>;
     default: return null;
   }
 }
@@ -29,6 +30,7 @@ const NAV = [
   { href: '/admin/matches', label: 'Matches', icon: 'zap' },
   { href: '/admin/categories', label: 'Categories', icon: 'layers' },
   { href: '/admin/reports', label: 'Reports', icon: 'flag' },
+  { href: '/admin/leaderboards', label: 'Leaderboards', icon: 'trophy' },
   { href: '/admin/universities', label: 'Universities', icon: 'building' },
   { href: '/admin/campuses', label: 'Campuses', icon: 'map' },
 ];

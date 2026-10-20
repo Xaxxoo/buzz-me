@@ -5,7 +5,7 @@ import { createApi } from './api';
 import { createAdminApi } from './admin-api';
 
 // Re-export types so pages can import everything from one place
-export type { AdminStats, AdminUser, AdminMatch, AdminCategory, AdminReport, AdminUniversity, AdminQuestion, ActivityPoint, Paginated, AdminCampus, AdminCampusLandmark, CampusLayout, AdminUserStatsResponse } from './admin-api';
+export type { AdminStats, AdminUser, AdminMatch, AdminCategory, AdminReport, AdminUniversity, AdminQuestion, ActivityPoint, Paginated, AdminCampus, AdminCampusLandmark, CampusLayout, AdminUserStatsResponse, LeaderboardPlayer, LeaderboardUniversity } from './admin-api';
 
 /** Single shared AuthClient for all admin pages. */
 export const adminAuth = new AuthClient();

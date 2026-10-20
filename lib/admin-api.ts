@@ -174,6 +174,27 @@ export interface AdminUserStatsResponse {
   sessions: { id: string; device_name: string; last_seen: string; created_at: string }[];
 }
 
+export interface LeaderboardPlayer {
+  id: string;
+  rank: number;
+  username: string;
+  rating: number;
+  matches_played: number;
+  matches_won: number;
+  rating_change?: number;
+  accuracy?: number;
+  correct_answers?: number;
+}
+
+export interface LeaderboardUniversity {
+  id: string;
+  rank: number;
+  name: string;
+  short_name: string;
+  country: string;
+  points: number;
+}
+
 export function createAdminApi(api: Api) {
   return {
     fetchStats: () => api.get<AdminStats>('/admin/stats'),
@@ -228,6 +249,14 @@ export function createAdminApi(api: Api) {
     createCampus: (data: any) => api.post<AdminCampus>('/admin/campuses', data),
     updateCampus: (id: string, data: any) => api.put<AdminCampus>(`/admin/campuses/${id}`, data),
     deleteCampus: (id: string) => api.del(`/admin/campuses/${id}`),
+
+    fetchPlayerLeaderboard: (page = 1, limit = 20, period = 'alltime', category?: string) => {
+      const params = new URLSearchParams({ page: String(page), limit: String(limit), period });
+      if (category) params.set('category', category);
+      return api.get<{ items: LeaderboardPlayer[]; total: number; page: number; limit: number }>(`/leaderboards/players?${params}`);
+    },
+    fetchUniversityLeaderboard: (page = 1, limit = 20) =>
+      api.get<{ items: LeaderboardUniversity[]; total: number; page: number; limit: number }>(`/leaderboards/universities?page=${page}&limit=${limit}`),
 
     fetchCampusLandmarks: (campusId: string) =>
       api.get<AdminCampusLandmark[]>(`/admin/campuses/${campusId}/landmarks`),
