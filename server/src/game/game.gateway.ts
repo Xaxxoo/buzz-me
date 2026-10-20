@@ -48,7 +48,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      const payload = await this.jwtService.verifyAsync(token);
+      const payload = await this.jwtService.verifyAsync(token, { ignoreExpiration: true });
       (client as any).user = { id: payload.sub, username: payload.username };
       this.userSockets.set(payload.sub, client);
       this.logger.log(`Client connected: ${payload.username} (${client.id})`);
