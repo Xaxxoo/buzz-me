@@ -100,6 +100,48 @@ export function bumpStreak(s: Save) {
   return froze;
 }
 
+/**
+ * Merge local and server saves, keeping the most-progressed data from each.
+ * Local wins for streak/daily (may not have synced), server wins for
+ * rating/match stats (authoritatively updated server-side after matches).
+ */
+export function mergeSaves(local: Save, remote: Save): Save {
+  // Pick the streak with the more recent `last` date, or the higher count
+  let streak = local.streak;
+  const localDay = local.streak.last ? dayNum(local.streak.last) : -1;
+  const remoteDay = remote.streak.last ? dayNum(remote.streak.last) : -1;
+  if (remoteDay > localDay) {
+    streak = { ...remote.streak };
+  } else if (remoteDay === localDay && remote.streak.n > local.streak.n) {
+    streak = { ...remote.streak };
+  }
+  streak.best = Math.max(local.streak.best, remote.streak.best);
+
+  // Pick the daily record for the more recent date
+  const daily = (() => {
+    if (!local.daily && !remote.daily) return null;
+    if (!local.daily) return remote.daily;
+    if (!remote.daily) return local.daily;
+    return dayNum(local.daily.date) >= dayNum(remote.daily.date) ? local.daily : remote.daily;
+  })();
+
+  // Server is authoritative for match stats (updated server-side after matches)
+  // Local is authoritative for daily/streak (updated client-side only)
+  const merged: Save = {
+    school: remote.school || local.school,
+    rating: remote.rating,
+    played: Math.max(local.played, remote.played),
+    won: Math.max(local.won, remote.won),
+    lost: Math.max(local.lost, remote.lost),
+    drawn: Math.max(local.drawn, remote.drawn),
+    cats: { ...local.cats, ...remote.cats },
+    daily,
+    bestDaily: Math.max(local.bestDaily ?? 0, remote.bestDaily ?? 0) || null,
+    streak,
+  };
+  return merged;
+}
+
 export function record(s: Save, cat: string, ok: boolean) {
   const c = s.cats[cat] || (s.cats[cat] = [0, 0]);
   c[1]++;

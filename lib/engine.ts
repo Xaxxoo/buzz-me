@@ -3,7 +3,7 @@ import { type DbQuestion, mapQuestion } from './api';
 import { DAILY, OPEN_MS, ROUNDS } from './config';
 import { confetti } from './confetti';
 import {
-  bumpStreak, defaultSave, liveStreak, loadSave, loadServerSave, nextIn, niceDate, record, syncSave, today, writeSave,
+  bumpStreak, defaultSave, liveStreak, loadSave, loadServerSave, mergeSaves, nextIn, niceDate, record, syncSave, today, writeSave,
   type Mark, type Save,
 } from './save';
 import { pickRival, school } from './schools';
@@ -333,10 +333,11 @@ export class GameEngine {
   async hydrate() {
     if (this.state.hydrated) return;
     this.save = loadSave();
-    // If authenticated, try loading from server
+    // If authenticated, merge server save with local (don't overwrite —
+    // streak/daily are tracked client-side and may not have synced).
     if (this.auth?.getSnapshot().status === 'authenticated') {
       const remote = await loadServerSave(this.auth.api);
-      if (remote) { this.save = remote; writeSave(remote); }
+      if (remote) { this.save = mergeSaves(this.save, remote); writeSave(this.save); }
     }
     this.set({ hydrated: true, you: this.keptSchool() });
     this.commit();
