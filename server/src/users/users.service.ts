@@ -76,18 +76,23 @@ export class UsersService {
     });
     if (!user) throw new NotFoundException('User not found');
 
-    // Return save data in frontend Save format
-    return user.save_data || {
+    // Always overlay authoritative columns on top of save data so the
+    // client never sees stale rating / match counts.
+    const base = user.save_data || {
       school: null,
+      daily: null,
+      bestDaily: null,
+      streak: { n: 0, last: null, best: 0, freeze: null },
+    };
+
+    return {
+      ...base,
       rating: user.rating,
       played: user.matches_played,
       won: user.matches_won,
       lost: user.matches_lost,
       drawn: user.matches_drawn,
-      cats: user.category_stats || {},
-      daily: null,
-      bestDaily: null,
-      streak: { n: 0, last: null, best: 0, freeze: null },
+      cats: user.category_stats || base.cats || {},
     };
   }
 
@@ -95,15 +100,11 @@ export class UsersService {
     const user = await this.usersRepo.findOneBy({ id: userId });
     if (!user) throw new NotFoundException('User not found');
 
+    // Only store the save blob. Do NOT overwrite authoritative columns
+    // (rating, matches_played, matches_won, etc.) — those are updated
+    // atomically by the game service after matches and must not be
+    // clobbered by potentially stale client data.
     user.save_data = saveData;
-
-    // Sync key fields from save data to user columns
-    if (typeof saveData.rating === 'number') user.rating = saveData.rating;
-    if (typeof saveData.played === 'number') user.matches_played = saveData.played;
-    if (typeof saveData.won === 'number') user.matches_won = saveData.won;
-    if (typeof saveData.lost === 'number') user.matches_lost = saveData.lost;
-    if (typeof saveData.drawn === 'number') user.matches_drawn = saveData.drawn;
-    if (saveData.cats && typeof saveData.cats === 'object') user.category_stats = saveData.cats;
 
     await this.usersRepo.save(user);
     return saveData;
