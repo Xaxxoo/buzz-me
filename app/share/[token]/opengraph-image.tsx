@@ -58,11 +58,13 @@ function crestDataUri(short: string, a: string, b: string, pat: Pattern): string
 const MARK_SQUARE: Record<string, string> = { right: '\u{1F7E9}', wrong: '\u{1F7E5}', skip: '\u2B1C' };
 
 /* ── Shared font config ── */
-async function getFonts() {
+type Font = { name: string; data: ArrayBuffer; style: 'normal'; weight: 600 | 700 };
+
+async function getFonts(): Promise<Font[]> {
   const [fontDisplay, fontBody] = await Promise.all([unboundedBold, interTightSemiBold]);
   return [
-    { name: 'Unbounded', data: fontDisplay, style: 'normal' as const, weight: 700 as const },
-    { name: 'Inter Tight', data: fontBody, style: 'normal' as const, weight: 600 as const },
+    { name: 'Unbounded', data: fontDisplay, style: 'normal', weight: 700 },
+    { name: 'Inter Tight', data: fontBody, style: 'normal', weight: 600 },
   ];
 }
 
@@ -88,7 +90,7 @@ export default async function OgImage({ params }: Props) {
   return dailyImage(data, fonts);
 }
 
-function matchImage(d: ShareToken & { k: 'm' }, fonts: { name: string; data: ArrayBuffer; style: 'normal'; weight: number }[]) {
+function matchImage(d: ShareToken & { k: 'm' }, fonts: Font[]) {
   const youCrest = crestDataUri(d.ys, d.ya, d.yb, d.yp);
   const rivalCrest = crestDataUri(d.rs, d.ra, d.rb, d.rp);
 
@@ -130,7 +132,7 @@ function matchImage(d: ShareToken & { k: 'm' }, fonts: { name: string; data: Arr
   );
 }
 
-function dailyImage(d: ShareToken & { k: 'd' }, fonts: { name: string; data: ArrayBuffer; style: 'normal'; weight: number }[]) {
+function dailyImage(d: ShareToken & { k: 'd' }, fonts: Font[]) {
   const crest = crestDataUri(d.ys, d.ya, d.yb, d.yp);
   const marks = parseMarks(d.m);
 
