@@ -6,6 +6,7 @@ import { StatCells } from '@/components/screens/Stats';
 import { DAILY, GAME_NAME } from '@/lib/config';
 import { num, shareText, type DailyResult, type MatchResult } from '@/lib/engine';
 import { useCountUp } from '@/lib/hooks';
+import { encodeResult } from '@/lib/share';
 import type { AuthStatus } from '@/lib/auth';
 
 interface Props {
@@ -26,13 +27,14 @@ function Card({ result, authStatus, onAgain, onMenu, onSignup }: { result: Match
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const text = shareText(result, GAME_NAME);
-  const url = typeof window !== 'undefined' ? window.location.origin : '';
-  const full = `${text}\n\n${url}`;
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const shareUrl = `${origin}/share/${encodeResult(result)}`;
+  const full = `${text}\n\n${shareUrl}`;
 
   const onShare = async () => {
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
-        await navigator.share({ text: full });
+        await navigator.share({ text, url: shareUrl });
         return;
       } catch { /* user cancelled or unsupported — fall through to menu */ }
     }
@@ -78,9 +80,9 @@ function Card({ result, authStatus, onAgain, onMenu, onSignup }: { result: Match
       </div>
       {shareOpen && (
         <div className="share-links flex justify-center gap-3 flex-wrap">
-          <a className="btn ghost small" href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(full)}`} target="_blank" rel="noopener noreferrer">X / Twitter</a>
+          <a className="btn ghost small" href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noopener noreferrer">X / Twitter</a>
           <a className="btn ghost small" href={`https://wa.me/?text=${encodeURIComponent(full)}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
-          <a className="btn ghost small" href={`https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(full)}&u=${encodeURIComponent(url)}`} target="_blank" rel="noopener noreferrer">Facebook</a>
+          <a className="btn ghost small" href={`https://www.facebook.com/sharer/sharer.php?quote=${encodeURIComponent(text)}&u=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noopener noreferrer">Facebook</a>
           <button className="btn ghost small" type="button" onClick={copyToClipboard}>{copied ? 'Copied!' : 'Copy'}</button>
         </div>
       )}
