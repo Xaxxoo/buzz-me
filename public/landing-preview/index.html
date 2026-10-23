@@ -363,6 +363,19 @@ kbd{font:600 11px var(--body)}
   .copy h2{display:none}
   .set{top:110px;height:calc(100svh - 110px - 300px)}
 }
+
+/* ── auth forms in sheet ── */
+.auth-wrap{display:flex;flex-direction:column;gap:14px}
+.auth-wrap[hidden]{display:none}
+.auth-wrap label{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
+.auth-wrap input{width:100%;padding:11px 14px;border:0;border-radius:12px;background:rgba(240,235,227,.07);color:var(--ink);font-size:15px;font-weight:500;box-shadow:inset 0 0 0 1px rgba(240,235,227,.1);transition:box-shadow .2s}
+.auth-wrap input:focus{outline:none;box-shadow:inset 0 0 0 1.5px var(--you)}
+.auth-wrap input::placeholder{color:rgba(240,235,227,.3)}
+.auth-err{margin:0;color:var(--neon-red);font-size:13px;font-weight:600;min-height:18px}
+.auth-toggle{margin:0;font-size:13px;color:var(--muted);text-align:center}
+.auth-toggle button{border:0;background:none;color:var(--you);cursor:pointer;font:inherit;font-weight:700;text-decoration:underline;text-underline-offset:2px}
+.auth-toggle button:hover{color:#e0ff6b}
+.sheet .gbtn[disabled]{opacity:.5;pointer-events:none}
 </style>
 </head>
 <body>
@@ -466,7 +479,31 @@ kbd{font:600 11px var(--body)}
   <div class="mbar"><button class="gbtn big js-signup" type="button" id="mobileCta">Sign up and play · free</button></div>
 
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
-    <div class="card"><h3 id="sheetTitle">Your buzzer's waiting</h3><p id="sheetText">Sign up free, pick your school, and play your first match.</p><div class="ctaRow"><a class="gbtn" href="/play" id="sheetGo">Open Campus Trivia</a><button class="gbtn dark" type="button" id="sheetClose">Back to the show</button></div></div>
+    <div class="card">
+      <h3 id="sheetTitle">Your buzzer's waiting</h3>
+      <p id="sheetText">Sign up free, pick your school, and play your first match.</p>
+
+      <!-- Signup form (default) -->
+      <form class="auth-wrap" id="signupForm" autocomplete="on">
+        <label>Username<input id="suUser" type="text" autocomplete="username" maxlength="20" placeholder="e.g. quizwhiz"></label>
+        <label>Email<input id="suEmail" type="email" autocomplete="email" placeholder="you@uni.edu"></label>
+        <label>Password<input id="suPass" type="password" autocomplete="new-password" placeholder="8+ characters"></label>
+        <p class="auth-err" id="suErr"></p>
+        <button class="gbtn" type="submit" id="suBtn">Sign up</button>
+        <p class="auth-toggle">Already have an account? <button type="button" id="toLogin">Sign in</button></p>
+      </form>
+
+      <!-- Login form (hidden) -->
+      <form class="auth-wrap" id="loginForm" hidden autocomplete="on">
+        <label>Username or Email<input id="liIdent" type="text" autocomplete="username" placeholder="username or email"></label>
+        <label>Password<input id="liPass" type="password" autocomplete="current-password" placeholder="your password"></label>
+        <p class="auth-err" id="liErr"></p>
+        <button class="gbtn" type="submit" id="liBtn">Sign in</button>
+        <p class="auth-toggle">Don't have an account? <button type="button" id="toSignup">Sign up</button></p>
+      </form>
+
+      <div class="ctaRow" style="margin-top:8px"><button class="gbtn dark" type="button" id="sheetClose">Back to the show</button></div>
+    </div>
   </div>
 </main>
 
@@ -883,12 +920,67 @@ $('micBtn').addEventListener('click',()=>{
   rec.start();
 });
 
-/* ═════════ sign up ═════════ */
+/* ═════════ sign up / log in ═════════ */
 const sheet=$('sheet');
-function openSheet(){ if(S.you) $('sheetText').textContent=`Sign up free, and play your first match for ${S.you.s}.`; sheet.classList.add('open'); $('sheetClose').focus(); }
+const API_BASE = (window.__API_BASE__ || 'https://buzz-me-production.up.railway.app/api/v1').replace(/\/$/,'');
+const signupForm=$('signupForm'), loginForm=$('loginForm');
+const suErr=$('suErr'), liErr=$('liErr');
+const USERNAME_RE = /^[a-zA-Z0-9_]+$/;
+
+function showSignup(){ signupForm.hidden=false; loginForm.hidden=true; $('sheetTitle').textContent="Your buzzer's waiting"; $('sheetText').textContent=S.you?`Sign up free, and play your first match for ${S.you.s}.`:'Sign up free, pick your school, and play your first match.'; suErr.textContent=''; }
+function showLogin(){ signupForm.hidden=true; loginForm.hidden=false; $('sheetTitle').textContent='Welcome back'; $('sheetText').textContent='Sign in to get back to the buzzer.'; liErr.textContent=''; }
+
+function openSheet(mode){
+  if(mode==='login') showLogin(); else showSignup();
+  sheet.classList.add('open');
+  setTimeout(()=>{ const first=mode==='login'?$('liIdent'):$('suUser'); first?.focus(); },80);
+}
 $('sheetClose').addEventListener('click',()=>sheet.classList.remove('open')); sheet.addEventListener('click',e=>{ if(e.target===sheet) sheet.classList.remove('open'); });
 addEventListener('keydown',e=>{ if(e.key==='Escape'){ sheet.classList.remove('open'); closePop(); closeAsk(); phoneEl.classList.remove('expanded'); scrim.classList.remove('on'); } });
-document.addEventListener('click',e=>{ if(e.target.closest('.js-signup')){ gesture('present'); say({id:23,aside:true}); setTimeout(openSheet,600); } });
+document.addEventListener('click',e=>{ if(e.target.closest('.js-signup')){ gesture('present'); say({id:23,aside:true}); setTimeout(()=>openSheet('signup'),600); } });
+
+/* header Log in button */
+document.querySelector('.tools .login')?.addEventListener('click',()=>openSheet('login'));
+
+/* toggle between forms */
+$('toLogin').addEventListener('click',showLogin);
+$('toSignup').addEventListener('click',showSignup);
+
+/* generic auth POST */
+async function authPost(path, body, errEl, btn){
+  const label=btn.textContent;
+  errEl.textContent='';
+  btn.disabled=true; btn.textContent=path==='/auth/signup'?'Creating account\u2026':'Signing in\u2026';
+  try{
+    const res=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!res.ok){ let msg; try{ msg=(await res.json()).message; }catch{ msg=await res.text(); } throw new Error(msg||'Request failed.'); }
+    const data=await res.json();
+    try{ localStorage.setItem('quad.token',data.access_token); localStorage.setItem('quad.refresh',data.refresh_token); }catch{}
+    window.location.href='/play';
+  }catch(e){
+    errEl.textContent=e.message||'Something went wrong.';
+    btn.disabled=false; btn.textContent=label;
+  }
+}
+
+/* signup submit */
+signupForm.addEventListener('submit',e=>{
+  e.preventDefault();
+  const u=$('suUser').value.trim(), em=$('suEmail').value.trim(), pw=$('suPass').value;
+  if(u.length<3||u.length>20){ suErr.textContent='Username must be 3\u201320 characters.'; return; }
+  if(!USERNAME_RE.test(u)){ suErr.textContent='Username must be letters, numbers, or underscores.'; return; }
+  if(!em.includes('@')){ suErr.textContent='Enter a valid email.'; return; }
+  if(pw.length<8){ suErr.textContent='Password must be at least 8 characters.'; return; }
+  authPost('/auth/signup',{username:u,email:em,password:pw},suErr,$('suBtn'));
+});
+
+/* login submit */
+loginForm.addEventListener('submit',e=>{
+  e.preventDefault();
+  const id=$('liIdent').value.trim(), pw=$('liPass').value;
+  if(!id||!pw){ liErr.textContent='Fill in both fields.'; return; }
+  authPost('/auth/login',{identifier:id,password:pw},liErr,$('liBtn'));
+});
 function buzzIn(){
   sfx.buzz(); navigator.vibrate?.(40); window.__john3d?.pressBuzzer();
   const r=$('buzz3d').getBoundingClientRect(); stage.style.setProperty('--fx',(r.left+r.width/2)+'px'); stage.style.setProperty('--fy',(r.top+r.height/2)+'px');

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { GAME_NAME } from '@/lib/config';
+import { GAME_NAME, API_BASE } from '@/lib/config';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -19,6 +19,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
+        {/* Expose API base to static pages (e.g. landing-preview) */}
+        <script dangerouslySetInnerHTML={{ __html: `window.__API_BASE__=${JSON.stringify(API_BASE)};` }} />
         {/* To self-host the fonts instead, switch these to next/font/google and map the two CSS variables in globals.css. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
