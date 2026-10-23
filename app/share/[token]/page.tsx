@@ -50,7 +50,7 @@ export default async function SharePage({ params }: Props) {
       </h1>
       <p style={{ fontSize: '1.1rem', opacity: 0.8 }}>{data.v}</p>
       <a
-        href="/"
+        href="/play"
         style={{
           display: 'inline-block',
           marginTop: '1rem',
