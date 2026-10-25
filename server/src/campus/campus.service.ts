@@ -63,6 +63,14 @@ export class CampusService {
     return this.campusRepo.save(campus);
   }
 
+  async findByUniversity(universityId: string) {
+    return this.campusRepo.find({
+      where: { university_id: universityId, active: true },
+      select: ['id', 'layout', 'fallback_image_url'],
+      order: { name: 'ASC' },
+    });
+  }
+
   async findLandmarks(campusId: string) {
     return this.landmarkRepo.find({
       where: { campus_id: campusId },

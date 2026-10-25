@@ -1,15 +1,18 @@
 'use client';
 
 import type { UniversityProfileData } from '@/lib/types';
+import type { CampusLayout3D } from '@/lib/campus-types';
 import { num } from '@/lib/engine';
+import { CampusScene } from '@/components/campus/CampusScene';
 
 interface Props {
   active: boolean;
   profile: UniversityProfileData | null;
+  campusLayout?: CampusLayout3D | null;
   onMenu: () => void;
 }
 
-export function UniversityProfile({ active, profile, onMenu }: Props) {
+export function UniversityProfile({ active, profile, campusLayout, onMenu }: Props) {
   if (!profile) return (
     <section className="screen enter flex-auto min-h-0 flex flex-col gap-3 overflow-y-auto" hidden={!active}>
       {active && <p style={{ font: '600 14px/1.3 var(--font-body)', opacity: 0.6, textAlign: 'center', padding: '20px 0' }}>Loading&hellip;</p>}
@@ -22,6 +25,14 @@ export function UniversityProfile({ active, profile, onMenu }: Props) {
         <button className="back" type="button" onClick={onMenu}>Menu</button>
         <h2>{profile.short_name}</h2>
       </div>
+
+      {campusLayout && (
+        <CampusScene
+          layout={campusLayout}
+          schoolColors={{ a: profile.color_a, b: profile.color_b }}
+          interactive={false}
+        />
+      )}
 
       <div className="uni-profile-header" style={{ '--uni-a': profile.color_a, '--uni-b': profile.color_b } as React.CSSProperties}>
         <h3>{profile.name}</h3>

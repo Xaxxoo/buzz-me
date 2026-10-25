@@ -9,6 +9,7 @@ import {
 import { pickRival, school } from './schools';
 import { setMuted, sfx } from './sfx';
 import type { QA, Question, School, Team, TeamData, LobbyState, NotificationData, ChallengeData, ChallengeLobbyState, UniversityProfileData } from './types';
+import type { CampusLayout3D } from './campus-types';
 
 /*
  * The game engine. It owns every timer and all match state, and publishes an immutable
@@ -117,6 +118,8 @@ export interface GameState {
   spectateMatchId: string | null;
   /* university profile */
   universityProfile: UniversityProfileData | null;
+  /* campus 3D layout */
+  campusLayout: CampusLayout3D | null;
   /* connectivity */
   online: boolean;
   reconnecting: boolean;
@@ -157,6 +160,7 @@ const initial = (): GameState => ({
   devices: [],
   spectating: false, spectateMatchId: null,
   universityProfile: null,
+  campusLayout: null,
   online: true,
   reconnecting: false,
   questionsLoading: false,
@@ -835,6 +839,9 @@ export class GameEngine {
   /* ---------- university profile ---------- */
   showUniversityProfile(profile: UniversityProfileData) {
     this.set({ screen: 's-uni-profile', universityProfile: profile });
+  }
+  setCampusLayout(layout: CampusLayout3D | null) {
+    this.set({ campusLayout: layout });
   }
   onSpectateState(data: { match_id: string; score_a: number; score_b: number; round: number; total: number }) {
     this.set({ scoreYou: data.score_a, scoreRival: data.score_b, qi: data.round - 1, total: data.total });

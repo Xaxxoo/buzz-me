@@ -21,6 +21,8 @@ import { GameEngine } from '@/lib/engine';
 import { registerPush } from '@/lib/push';
 import { SocketClient } from '@/lib/socket';
 import type { DbCategory, TeamData, ChallengeData, UniversityProfileData } from '@/lib/types';
+import type { CampusLayout } from '@/lib/admin-api';
+import { normalizeCampusLayout } from '@/lib/campus-types';
 
 /**
  * The whole game is one client component tree driven by a GameEngine instance.
@@ -293,7 +295,19 @@ export default function Game({ joinCode }: { joinCode?: string } = {}) {
   /* ---------- university profile ---------- */
   const onViewUniversity = async (universityId: string) => {
     try {
-      const profile = await auth.api.get<UniversityProfileData>(`/universities/${universityId}/profile`);
+      const [profile, campuses] = await Promise.all([
+        auth.api.get<UniversityProfileData>(`/universities/${universityId}/profile`),
+        fetch(`${API_BASE}/campuses/public/${universityId}`).then(r => r.ok ? r.json() as Promise<{ layout: CampusLayout; fallback_image_url: string | null }[]> : []).catch(() => [] as { layout: CampusLayout; fallback_image_url: string | null }[]),
+      ]);
+      const campus = campuses[0];
+      if (campus?.layout) {
+        engine.setCampusLayout(normalizeCampusLayout(campus.layout, {
+          accent: profile.color_a,
+          accentB: profile.color_b,
+        }));
+      } else {
+        engine.setCampusLayout(null);
+      }
       engine.showUniversityProfile(profile);
     } catch { /* ignore */ }
   };
@@ -437,7 +451,7 @@ export default function Game({ joinCode }: { joinCode?: string } = {}) {
           }}
         />
         <Leaderboard active={s.screen === 's-leaderboard'} auth={auth} authStatus={authState.status} onMenu={() => engine.menu()} />
-        <UniversityProfile active={s.screen === 's-uni-profile'} profile={s.universityProfile} onMenu={() => engine.menu()} />
+        <UniversityProfile active={s.screen === 's-uni-profile'} profile={s.universityProfile} campusLayout={s.campusLayout} onMenu={() => engine.menu()} />
 
         {s.incomingChallenge && (
           <div className="challenge-toast">
