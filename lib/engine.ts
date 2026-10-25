@@ -1115,7 +1115,9 @@ export class GameEngine {
   }
 
   private showDailyResult(fresh: boolean) {
-    const d = this.save.daily!, you = this.state.you!, n = liveStreak(this.save);
+    const d = this.save.daily!, you = this.state.you;
+    if (!you) return;
+    const n = liveStreak(this.save);
     this.set({
       screen: 's-result', resultKey: this.key(),
       result: {
@@ -1133,7 +1135,8 @@ export class GameEngine {
   private finish() {
     this.cut();
     this.phase = 'done';
-    const { scoreYou, scoreRival } = this.state, you = this.state.you!;
+    const { scoreYou, scoreRival } = this.state, you = this.state.you;
+    if (!you) return;
     if (this.state.mode === 'daily') {
       const froze = bumpStreak(this.save);
       this.save.daily = { date: this.day, score: scoreYou, marks: this.marks, right: this.tally.won, best: this.tally.best, froze };
@@ -1141,7 +1144,9 @@ export class GameEngine {
       this.commit();
       return this.showDailyResult(true);
     }
-    const rival = this.state.rival!, d = scoreYou - scoreRival;
+    const rival = this.state.rival;
+    if (!rival) return;
+    const d = scoreYou - scoreRival;
     /* Elo against a fixed 1000-rated bot. */
     const expected = 1 / (1 + Math.pow(10, (1000 - this.save.rating) / 400));
     const delta = Math.round(32 * ((d > 0 ? 1 : d < 0 ? 0 : 0.5) - expected));
