@@ -13,7 +13,7 @@ import { BuildingLabel } from './meshes/BuildingLabel';
 
 /* ── Inner scene that runs inside the Canvas context ── */
 
-function Scene({ layout, interactive, selectedBuilding, onBuildingClick, onBuildingHover }: CampusSceneProps) {
+function Scene({ layout, selectedBuilding, onBuildingClick, onBuildingHover }: CampusSceneProps) {
   const progress = useEntranceAnimation();
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
@@ -79,6 +79,10 @@ export default function CampusCanvas(props: CampusSceneProps) {
       dpr={[1, 2]}
       style={{ width: '100%', height: '100%' }}
       gl={{ antialias: true, alpha: true }}
+      onCreated={({ camera }) => {
+        camera.lookAt(0, 0, 0);
+        camera.updateProjectionMatrix();
+      }}
     >
       <Scene {...props} />
       {props.interactive && (

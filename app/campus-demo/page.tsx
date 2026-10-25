@@ -1,8 +1,26 @@
 'use client';
 
-import { useState } from 'react';
-import { CampusScene } from '@/components/campus/CampusScene';
+import { Component, Suspense, useState, useEffect, type ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import type { CampusLayout3D } from '@/lib/campus-types';
+import { checkCapabilities } from '@/lib/capabilities';
+
+const CampusCanvas = dynamic(() => import('@/components/campus/CampusCanvas'), { ssr: false });
+
+/* ── Error boundary ── */
+class ErrorBoundary extends Component<{ children: ReactNode; onError?: (msg: string) => void }, { error: string | null }> {
+  state = { error: null as string | null };
+  static getDerivedStateFromError(e: Error) { return { error: e.message + '\n' + e.stack }; }
+  componentDidCatch(e: Error) { this.props.onError?.(e.message); }
+  render() {
+    if (this.state.error) return (
+      <div style={{ padding: 16, background: '#1a0000', border: '1px solid #f87171', borderRadius: 12, color: '#f87171', font: '500 12px/1.5 monospace', whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>
+        {this.state.error}
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 const UNILAG: CampusLayout3D = {
   bounds: { width: 100, height: 100 },
@@ -109,15 +127,38 @@ const CAMPUSES = [
 export default function CampusDemoPage() {
   const [idx, setIdx] = useState(0);
   const [interactive, setInteractive] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
+
+  // Capture unhandled errors from the canvas GL context
+  useEffect(() => {
+    const onErr = (e: ErrorEvent) => setErrors(prev => [...prev, e.message]);
+    const onRej = (e: PromiseRejectionEvent) => setErrors(prev => [...prev, String(e.reason)]);
+    window.addEventListener('error', onErr);
+    window.addEventListener('unhandledrejection', onRej);
+    return () => { window.removeEventListener('error', onErr); window.removeEventListener('unhandledrejection', onRej); };
+  }, []);
+
+  const caps = typeof window !== 'undefined' ? checkCapabilities() : null;
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: '40px 20px', fontFamily: 'var(--font-body, system-ui)' }}>
       <h1 style={{ font: '800 28px/1.1 var(--font-display, system-ui)', color: '#c6f432', marginBottom: 8 }}>
         Campus 3D Demo
       </h1>
-      <p style={{ color: '#8a847b', fontSize: 14, marginBottom: 24 }}>
-        Three.js isometric campus renderer — same data as the Canvas2D prototype.
+      <p style={{ color: '#8a847b', fontSize: 14, marginBottom: 8 }}>
+        Three.js isometric campus renderer.
       </p>
+      {caps && (
+        <p style={{ color: caps.canRender3D ? '#34d399' : '#f87171', fontSize: 12, marginBottom: 16, fontFamily: 'monospace' }}>
+          Device check: {caps.canRender3D ? 'PASS' : `BLOCKED — ${caps.reason}`} (bypassed for demo)
+        </p>
+      )}
+
+      {errors.length > 0 && (
+        <div style={{ padding: 12, marginBottom: 16, background: '#1a0000', border: '1px solid #f87171', borderRadius: 10, color: '#f87171', font: '500 11px/1.5 monospace', maxHeight: 120, overflow: 'auto' }}>
+          {errors.map((e, i) => <div key={i}>{e}</div>)}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
         {CAMPUSES.map((c, i) => (
@@ -125,13 +166,11 @@ export default function CampusDemoPage() {
             key={c.label}
             onClick={() => setIdx(i)}
             style={{
-              padding: '10px 22px',
-              borderRadius: 10,
+              padding: '10px 22px', borderRadius: 10, cursor: 'pointer',
               border: i === idx ? '1px solid rgba(198,244,50,0.2)' : '1px solid rgba(255,255,255,0.06)',
               background: i === idx ? 'rgba(198,244,50,0.08)' : 'transparent',
               color: i === idx ? '#c6f432' : '#8a847b',
               font: '600 13px var(--font-body, system-ui)',
-              cursor: 'pointer',
             }}
           >
             {c.label}
@@ -140,25 +179,28 @@ export default function CampusDemoPage() {
         <button
           onClick={() => setInteractive(!interactive)}
           style={{
-            marginLeft: 'auto',
-            padding: '10px 16px',
-            borderRadius: 10,
+            marginLeft: 'auto', padding: '10px 16px', borderRadius: 10, cursor: 'pointer',
             border: '1px solid rgba(255,255,255,0.06)',
             background: interactive ? 'rgba(198,244,50,0.08)' : 'transparent',
             color: interactive ? '#c6f432' : '#8a847b',
             font: '600 13px var(--font-body, system-ui)',
-            cursor: 'pointer',
           }}
         >
           {interactive ? 'Orbit: ON' : 'Orbit: OFF'}
         </button>
       </div>
 
-      <CampusScene
-        key={idx}
-        layout={CAMPUSES[idx].layout}
-        interactive={interactive}
-      />
+      <ErrorBoundary onError={msg => setErrors(prev => [...prev, msg])}>
+        <div style={{ width: '100%', aspectRatio: '16/10', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.06)', background: '#0d1117' }}>
+          <Suspense fallback={<div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: '#8a847b', fontSize: 13 }}>Loading Three.js…</div>}>
+            <CampusCanvas
+              key={idx}
+              layout={CAMPUSES[idx].layout}
+              interactive={interactive}
+            />
+          </Suspense>
+        </div>
+      </ErrorBoundary>
     </div>
   );
 }

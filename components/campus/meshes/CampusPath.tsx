@@ -1,6 +1,7 @@
 'use client';
 
-import { Line } from '@react-three/drei';
+import { useMemo } from 'react';
+import * as THREE from 'three';
 
 interface CampusPathProps {
   points: [number, number][];
@@ -9,27 +10,12 @@ interface CampusPathProps {
 export function CampusPath({ points }: CampusPathProps) {
   if (points.length < 2) return null;
 
-  // Convert 2D campus coords (x, y) -> Three.js (x, 0.05, z)
-  const pts: [number, number, number][] = points.map(([px, py]) => [px, 0.05, py]);
+  const lineObj = useMemo(() => {
+    const pts = points.map(([px, py]) => new THREE.Vector3(px, 0.05, py));
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: 'rgb(220,210,190)', transparent: true, opacity: 0.15 });
+    return new THREE.Line(geo, mat);
+  }, [points]);
 
-  return (
-    <group>
-      {/* wider backing strip */}
-      <Line
-        points={pts}
-        color="rgb(220,210,190)"
-        transparent
-        opacity={0.06}
-        lineWidth={4}
-      />
-      {/* narrower top line */}
-      <Line
-        points={pts}
-        color="rgb(220,210,190)"
-        transparent
-        opacity={0.12}
-        lineWidth={2}
-      />
-    </group>
-  );
+  return <primitive object={lineObj} />;
 }
