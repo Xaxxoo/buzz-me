@@ -5,20 +5,33 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "poster": "tsx scripts/poster.ts",
+    "marketing:social": "tsx scripts/social.ts",
+    "marketing:merch": "tsx scripts/merch.ts",
+    "marketing:gallery": "tsx scripts/gallery.ts",
+    "marketing:build": "tsx scripts/social.ts && tsx scripts/merch.ts && tsx scripts/gallery.ts"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
     "@tailwindcss/postcss": "^4.3.3",
     "next": "^16.3.8",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "socket.io-client": "^4.8.4",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.186.0",
+    "playwright": "^1.48.0",
+    "qrcode": "^1.5.4",
+    "tsx": "^4.19.0",
     "typescript": "^7.0.2"
   },
   "engines": {
