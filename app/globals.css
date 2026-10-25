@@ -1016,3 +1016,76 @@
   .admin-search .admin-input { max-width: unset; }
   .admin-toolbar { flex-direction: column; align-items: stretch; }
 }
+
+/* ── 3D Arena overlay ── */
+.arena-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.arena-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.arena-overlay-panel {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 32px;
+  background: rgba(10, 10, 9, 0.92);
+  border: 1px solid rgba(198, 244, 50, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+}
+
+.arena-overlay-badge {
+  pointer-events: none;
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.arena-loading {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  background: var(--color-bg);
+}
+
+.arena-shimmer {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(198,244,50,0.05) 0%, rgba(198,244,50,0.15) 50%, rgba(198,244,50,0.05) 100%);
+  background-size: 200% 200%;
+  animation: arena-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes arena-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.finding-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(198, 244, 50, 0.2);
+  border-top-color: var(--color-sun);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
