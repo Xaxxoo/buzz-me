@@ -295,7 +295,7 @@ export class GameEngine {
   private rivalPanel(small: string, big: string | null = null, mark: RivalView['mark'] = '') {
     this.set({ zone: 'rival', ask: null, rivalView: { small, big, mark } });
   }
-  private colors(extra: string[] = []) { const y = this.state.you!; return [y.a, y.b, '#f0ebe3', '#c6f432', ...extra]; }
+  private colors(extra: string[] = []) { const y = this.state.you; if (!y) return ['#f0ebe3', '#c6f432', ...extra]; return [y.a, y.b, '#f0ebe3', '#c6f432', ...extra]; }
   private cheer(n: number) { confetti.burstFrom(document.getElementById('opts'), n, this.colors(['#E8322C'])); }
 
   /* ---------- answering ---------- */
@@ -994,6 +994,7 @@ export class GameEngine {
   }
 
   onlineBonusResult(data: { correct: boolean; correct_answer: string; points: number; score_a: number; score_b: number }) {
+    if (this.phase === 'idle' || this.phase === 'done') return;
     this.cut();
     const myScore = this.mySide === 'a' ? data.score_a : data.score_b;
     const theirScore = this.mySide === 'a' ? data.score_b : data.score_a;
@@ -1030,9 +1031,11 @@ export class GameEngine {
   }
 
   onlineMatchEnd(data: { match_id: string; score_a: number; score_b: number; rating_before: number; rating_after: number; rating_delta: number; rounds_won: number; total_rounds: number }) {
+    if (this.phase === 'idle') return;
     this.cut();
     this.phase = 'done';
-    const you = this.state.you!, rival = this.state.rival!;
+    const you = this.state.you, rival = this.state.rival;
+    if (!you || !rival) return;
     const scoreYou = this.mySide === 'a' ? data.score_a : data.score_b;
     const scoreRival = this.mySide === 'a' ? data.score_b : data.score_a;
     const d = scoreYou - scoreRival;
