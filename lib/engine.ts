@@ -591,7 +591,8 @@ export class GameEngine {
   /** The player hit the buzzer. */
   buzz() {
     if (this.phase !== 'reading' && this.phase !== 'open') return;
-    const you = this.state.you!;
+    const you = this.state.you;
+    if (!you) return;
     this.cut();
     this.early = !this.full;
     this.heard = this.ri / this.all.length;
@@ -609,7 +610,8 @@ export class GameEngine {
   }
 
   private tossResult = (ok: boolean, text: string | null) => {
-    const q = this.q!, rival = this.state.rival!;
+    const q = this.q!, rival = this.state.rival;
+    if (!rival) return;
     record(this.save, q.c, ok); this.commit();
     if (ok) {
       const pts = this.early ? 15 : 10;
@@ -628,7 +630,8 @@ export class GameEngine {
   };
 
   private rivalSteal() {
-    const q = this.q!, rival = this.state.rival!;
+    const q = this.q!, rival = this.state.rival;
+    if (!rival) return;
     this.phase = 'rival';
     this.fillRest(); this.seat('rival');
     this.rivalPanel(rival.short + ' hears the full question');
@@ -649,7 +652,8 @@ export class GameEngine {
 
   private rivalBuzz() {
     if (this.phase !== 'reading' && this.phase !== 'open') return;
-    const q = this.q!, rival = this.state.rival!;
+    const q = this.q!, rival = this.state.rival;
+    if (!rival) return;
     this.cut();
     const early = !this.full;
     this.phase = 'rival';
@@ -696,7 +700,9 @@ export class GameEngine {
   private bonus(team: Team) {
     this.cut();
     this.phase = 'bonus';
-    const q = this.q!, b = q.b, name = (team === 'you' ? this.state.you! : this.state.rival!).short;
+    const q = this.q!, b = q.b, school = team === 'you' ? this.state.you : this.state.rival;
+    if (!school) return;
+    const name = school.short;
     this.set({
       bonusCard: true, tag: 'Bonus for ' + name, answer: null,
       words: (b.t || '').trim().replace(/\s+/g, ' ').split(' ').filter(w => w.length > 0).map((text, i) => ({ text, late: false, delay: i * 25 })),
