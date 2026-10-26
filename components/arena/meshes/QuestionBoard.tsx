@@ -19,11 +19,11 @@ interface QuestionBoardProps {
 export function QuestionBoard({ tag, words, visibleCount, answer, bonusCard, progress }: QuestionBoardProps) {
   const groupRef = useRef<THREE.Group>(null);
 
-  // Build the visible text string
+  // Build the visible text string — words don't include trailing spaces
   const visibleText = words
     .slice(0, visibleCount)
     .map(w => w.text)
-    .join('');
+    .join(' ');
 
   // Question text texture
   const { texture: qTex, aspect: qAspect } = useCanvasTexture((ctx, canvas) => {
