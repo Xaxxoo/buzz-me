@@ -115,7 +115,7 @@ export const ArenaScene = memo(function ArenaScene({ s, onBuzz, onAnswer }: Aren
       <TimerRing
         secs={showOpts && s.ask ? s.ask.secs : 0}
         timerKey={s.ask?.key ?? 0}
-        position={[0, 5, 2]}
+        position={[0, 4.5, 7]}
         radius={1.5}
       />
 

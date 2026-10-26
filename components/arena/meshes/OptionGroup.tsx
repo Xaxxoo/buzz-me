@@ -18,12 +18,12 @@ const LETTERS = ['A', 'B', 'C', 'D'];
 export function OptionGroup({ ask, visible, onAnswer }: OptionGroupProps) {
   if (!ask || !visible) return null;
 
-  // 2x2 layout centered at [0, 2.5, 2]
+  // 2x2 layout at z=7 — in front of podiums (z=2) so scores don't overlap
   const positions: [number, number, number][] = [
-    [-2.8, 3.2, 2],   // A — top left
-    [2.8, 3.2, 2],    // B — top right
-    [-2.8, 1.6, 2],   // C — bottom left
-    [2.8, 1.6, 2],    // D — bottom right
+    [-2.4, 3.0, 7],   // A — top left
+    [2.4, 3.0, 7],    // B — top right
+    [-2.4, 1.4, 7],   // C — bottom left
+    [2.4, 1.4, 7],    // D — bottom right
   ];
 
   return (
