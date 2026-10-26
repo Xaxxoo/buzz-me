@@ -104,8 +104,8 @@ export function QuestionBoard({ tag, words, visibleCount, answer, bonusCard, pro
     return { canvas: c, ctx: cx, texture: tex };
   }, []);
 
-  // Dispose texture on unmount
-  useEffect(() => () => { texture.dispose(); }, [texture]);
+  // Dispose texture on unmount — safe against lost GL context
+  useEffect(() => () => { try { texture.dispose(); } catch { /* context lost */ } }, [texture]);
 
   // Redraw only when content actually changes
   const visibleText = words.slice(0, visibleCount).map(w => w.text).join(' ');

@@ -6,6 +6,8 @@ import * as THREE from 'three';
  * Takes a draw callback and deps; returns `{ texture, aspect }`.
  * Handles 2x DPI scaling, canvas creation, THREE.CanvasTexture creation,
  * and disposes previous textures when deps change.
+ *
+ * All disposal is wrapped in try/catch to survive GL context loss.
  */
 export function useCanvasTexture(
   draw: (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => { w: number; h: number },
@@ -15,10 +17,8 @@ export function useCanvasTexture(
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const result = useMemo(() => {
-    // Dispose previous texture to prevent GPU memory leak
-    if (prevTexture.current) {
-      prevTexture.current.dispose();
-    }
+    // Dispose previous texture — safe against lost GL context
+    try { prevTexture.current?.dispose(); } catch { /* context lost */ }
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d')!;
@@ -40,13 +40,11 @@ export function useCanvasTexture(
     return { texture, aspect: w / h };
   }, deps);
 
-  // Dispose on unmount
+  // Dispose on unmount — safe against lost GL context
   useEffect(() => {
     return () => {
-      if (prevTexture.current) {
-        prevTexture.current.dispose();
-        prevTexture.current = null;
-      }
+      try { prevTexture.current?.dispose(); } catch { /* context lost */ }
+      prevTexture.current = null;
     };
   }, []);
 

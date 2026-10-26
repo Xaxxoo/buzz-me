@@ -49,7 +49,7 @@ export function TimerRing({ secs, timerKey, position, radius }: TimerRingProps) 
     group.add(line);
     lineObj.current = line;
     return () => {
-      group.remove(line);
+      try { group.remove(line); } catch { /* already gone */ }
       lineObj.current = null;
     };
   }, [geometry, material]);
