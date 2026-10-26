@@ -40,7 +40,7 @@ function ScoreSprite({ score, position }: { score: number; position: [number, nu
     return { w, h };
   }, [display]);
 
-  const spriteH = 1.2;
+  const spriteH = 1.6;
   return (
     <sprite position={position} scale={[spriteH * aspect, spriteH, 1]}>
       <spriteMaterial map={texture} transparent depthTest={false} />
@@ -65,7 +65,7 @@ function NameSprite({ name, position }: { name: string; position: [number, numbe
     return { w, h };
   }, [name]);
 
-  const spriteH = 0.7;
+  const spriteH = 1.0;
   return (
     <sprite position={position} scale={[spriteH * aspect, spriteH, 1]}>
       <spriteMaterial map={texture} transparent depthTest={false} />
@@ -159,7 +159,7 @@ export function Podium({ position, color, name, score, seat, team, progress }: P
       {[0, 1, 2, 3].map(i => {
         const on = seat && seat.team === team && seat.idx === i;
         return (
-          <mesh key={i} position={[-1.2 + i * 0.8, PODIUM_HEIGHT + 0.2, 0]}>
+          <mesh key={i} position={[-0.9 + i * 0.6, PODIUM_HEIGHT + 0.2, 0]}>
             <sphereGeometry args={[0.12, 12, 12]} />
             <meshStandardMaterial
               color={on ? '#c6f432' : '#333'}
