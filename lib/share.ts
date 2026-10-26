@@ -37,18 +37,12 @@ export type ShareToken = MatchToken | DailyToken;
 /* ── Base64url helpers ── */
 
 function toBase64url(s: string): string {
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(s, 'utf-8').toString('base64url');
-  }
-  // Browser fallback
+  // Always use the browser-safe path — Buffer polyfills don't support 'base64url'
   return btoa(unescape(encodeURIComponent(s)))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 function fromBase64url(s: string): string {
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(s, 'base64url').toString('utf-8');
-  }
   const padded = s.replace(/-/g, '+').replace(/_/g, '/');
   return decodeURIComponent(escape(atob(padded)));
 }
