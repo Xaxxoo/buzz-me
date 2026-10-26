@@ -1,8 +1,8 @@
 /** Arena layout constants — positions, sizes, timing */
 
 /* ── Positions ── */
-export const PODIUM_YOU_POS: [number, number, number] = [-5, 0, 2];
-export const PODIUM_RIVAL_POS: [number, number, number] = [5, 0, 2];
+export const PODIUM_YOU_POS: [number, number, number] = [-3.5, 0, 2];
+export const PODIUM_RIVAL_POS: [number, number, number] = [3.5, 0, 2];
 export const BUZZER_POS: [number, number, number] = [0, 1.5, 4];
 export const QUESTION_BOARD_POS: [number, number, number] = [0, 6, -4];
 export const FLOOR_Y = 0;
@@ -11,9 +11,9 @@ export const FLOOR_Y = 0;
 export const FLOOR_RADIUS = 16;
 export const FLOOR_SEGMENTS = 64;
 
-export const PODIUM_WIDTH = 3;
-export const PODIUM_HEIGHT = 2.5;
-export const PODIUM_DEPTH = 2;
+export const PODIUM_WIDTH = 2.4;
+export const PODIUM_HEIGHT = 2.2;
+export const PODIUM_DEPTH = 1.6;
 
 export const BUZZER_RADIUS = 1.2;
 export const BUZZER_BASE_RADIUS = 0.8;
@@ -31,7 +31,7 @@ export const SEAT_RADIUS = 14;
 export const PIP_SIZE = 0.25;
 
 /* ── Camera ── */
-export const CAMERA_FOV = 45;
+export const CAMERA_FOV = 50;
 export const CAMERA_POS: [number, number, number] = [0, 8, 18];
 export const CAMERA_TARGET: [number, number, number] = [0, 2, 0];
 
