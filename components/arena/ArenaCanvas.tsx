@@ -52,9 +52,10 @@ export default function ArenaCanvas(props: ArenaCanvasProps) {
 
   return (
     <section className="screen match enter flex-auto min-h-0 flex flex-col" id="s-match" hidden={!active}>
-      {/* R3F Canvas — takes full space */}
+      {/* R3F Canvas — stays mounted but pauses render loop when inactive */}
       <div className="arena-canvas-wrap">
         <Canvas
+          frameloop={active ? 'always' : 'never'}
           camera={{
             fov: CAMERA_FOV,
             position: CAMERA_POS,
@@ -63,12 +64,12 @@ export default function ArenaCanvas(props: ArenaCanvasProps) {
           }}
           dpr={[1, 1.5]}
           style={{ width: '100%', height: '100%' }}
-          gl={{ antialias: true, alpha: false }}
+          gl={{ antialias: true, alpha: false, powerPreference: 'default' }}
           onCreated={({ camera }) => {
             camera.lookAt(CAMERA_TARGET[0], CAMERA_TARGET[1], CAMERA_TARGET[2]);
           }}
         >
-          <ArenaScene s={s} onBuzz={onBuzz} onAnswer={onAnswer} />
+          {active && <ArenaScene s={s} onBuzz={onBuzz} onAnswer={onAnswer} />}
         </Canvas>
       </div>
 

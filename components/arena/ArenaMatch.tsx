@@ -38,9 +38,9 @@ class ArenaBoundary extends Component<
  *
  * - If 3D is supported → loads ArenaCanvas (lazy, no SSR).
  * - If not → renders the existing flat Match component.
- * - The Canvas is only mounted while the match screen is active.
- *   When active becomes false the Canvas unmounts, releasing all
- *   GPU resources (textures, geometries, render loop).
+ * - The Canvas stays mounted but pauses its render loop when the match
+ *   screen is inactive (frameloop="never"). This avoids both the GPU
+ *   burn of a running loop AND the disposal crashes from unmounting.
  * - An error boundary catches any Three.js crash and falls back
  *   to the 2D match for the rest of the session.
  */
@@ -67,18 +67,11 @@ export function ArenaMatch(props: Props) {
     return <Match {...props} />;
   }
 
-  // Only mount the Canvas while the match screen is active.
-  // This fully releases the WebGL context, textures, and render loop
-  // when navigating to result/menu/etc.
-  if (!props.active) {
-    return <section className="screen match flex-auto min-h-0 flex flex-col" id="s-match" hidden />;
-  }
-
   return (
     <ArenaBoundary fallback={<Match {...props} />}>
       <Suspense
         fallback={
-          <section className="screen match enter flex-auto min-h-0 flex flex-col" id="s-match">
+          <section className="screen match enter flex-auto min-h-0 flex flex-col" id="s-match" hidden={!props.active}>
             <div className="arena-loading">
               <div className="arena-shimmer" />
             </div>
