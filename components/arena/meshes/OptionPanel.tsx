@@ -63,13 +63,13 @@ export function OptionPanel({ option, letter, index, onAnswer, entranceDelay }: 
       // Stagger entrance from right
       const entranceTime = elapsed.current - entranceDelay;
       if (entranceTime < 0) {
-        m.position.x = 5; // offscreen right
+        m.position.x = 3; // offscreen right
         (m.material as THREE.SpriteMaterial).opacity = 0;
         return;
       }
       const t = Math.min(entranceTime / 0.3, 1);
       const ease = 1 - Math.pow(1 - t, 3);
-      m.position.x = 5 * (1 - ease);
+      m.position.x = 3 * (1 - ease);
       (m.material as THREE.SpriteMaterial).opacity = ease;
       if (t >= 1) entered.current = true;
     }

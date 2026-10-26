@@ -18,12 +18,12 @@ const LETTERS = ['A', 'B', 'C', 'D'];
 export function OptionGroup({ ask, visible, onAnswer }: OptionGroupProps) {
   if (!ask || !visible) return null;
 
-  // 2x2 layout centered at [0, 2.5, 6]
+  // 2x2 layout centered at [0, 2.5, 2]
   const positions: [number, number, number][] = [
-    [-3, 3.2, 6],   // A — top left
-    [3, 3.2, 6],    // B — top right
-    [-3, 1.4, 6],   // C — bottom left
-    [3, 1.4, 6],    // D — bottom right
+    [-2.8, 3.2, 2],   // A — top left
+    [2.8, 3.2, 2],    // B — top right
+    [-2.8, 1.6, 2],   // C — bottom left
+    [2.8, 1.6, 2],    // D — bottom right
   ];
 
   return (

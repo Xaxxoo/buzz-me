@@ -114,7 +114,7 @@ export function ArenaScene({ s, onBuzz, onAnswer }: ArenaSceneProps) {
         <TimerRing
           secs={s.ask.secs}
           timerKey={s.ask.key}
-          position={[0, 5.5, 6]}
+          position={[0, 5, 2]}
           radius={1.5}
         />
       )}
