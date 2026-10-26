@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, memo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import type { GameState } from '@/lib/engine';
 import type { Team } from '@/lib/types';
@@ -24,7 +24,14 @@ interface ArenaSceneProps {
   onAnswer: (text: string) => void;
 }
 
-export function ArenaScene({ s, onBuzz, onAnswer }: ArenaSceneProps) {
+/**
+ * Root scene orchestrator.
+ *
+ * Key design: components are always mounted and use visibility toggles instead
+ * of conditional mount/unmount. This avoids re-creating textures, geometries,
+ * and materials on every zone change which causes GPU memory churn and crashes.
+ */
+export const ArenaScene = memo(function ArenaScene({ s, onBuzz, onAnswer }: ArenaSceneProps) {
   const progress = useArenaEntrance();
   const shakeOffset = useCameraShake(s.flash?.key ?? 0);
   const { camera } = useThree();
@@ -32,17 +39,20 @@ export function ArenaScene({ s, onBuzz, onAnswer }: ArenaSceneProps) {
 
   // Apply camera shake
   useFrame(() => {
-    const [ox, oy, oz] = shakeOffset.current;
+    const [ox, oy] = shakeOffset.current;
     camera.position.set(
       baseCamPos.current.x + ox,
       baseCamPos.current.y + oy,
-      baseCamPos.current.z + oz,
+      baseCamPos.current.z,
     );
     camera.lookAt(CAMERA_TARGET[0], CAMERA_TARGET[1], CAMERA_TARGET[2]);
   });
 
   const teamColor = (t: Team) => (t === 'you' ? s.you?.a : s.rival?.a) ?? '#1B1464';
   const accentColor = s.you?.a ?? '#0B8457';
+  const showBuzzer = !s.spectating && s.zone === 'buzz';
+  const showOpts = !s.spectating && s.zone === 'opts';
+  const showRival = s.zone === 'rival';
 
   return (
     <>
@@ -82,13 +92,11 @@ export function ArenaScene({ s, onBuzz, onAnswer }: ArenaSceneProps) {
         />
       )}
 
-      {/* Buzzer dome — visible in buzz zone, hidden when spectating */}
-      {!s.spectating && s.zone === 'buzz' && (
-        <>
-          <BuzzerDome buzzLive={s.buzzLive} onBuzz={onBuzz} progress={progress} />
-          <TimerRing secs={s.window.secs} timerKey={s.window.key} />
-        </>
-      )}
+      {/* Buzzer dome — stays mounted, visibility controlled via prop */}
+      <BuzzerDome buzzLive={s.buzzLive} onBuzz={onBuzz} progress={progress} visible={showBuzzer} />
+
+      {/* Buzzer window timer */}
+      <TimerRing secs={showBuzzer ? s.window.secs : 0} timerKey={s.window.key} />
 
       {/* Question board */}
       <QuestionBoard
@@ -100,33 +108,25 @@ export function ArenaScene({ s, onBuzz, onAnswer }: ArenaSceneProps) {
         progress={progress}
       />
 
-      {/* Answer options — visible in opts zone */}
-      {!s.spectating && (
-        <OptionGroup
-          ask={s.ask}
-          visible={s.zone === 'opts'}
-          onAnswer={onAnswer}
-        />
-      )}
+      {/* Answer options — stays mounted, visibility controlled via prop */}
+      <OptionGroup ask={s.ask} visible={showOpts} onAnswer={onAnswer} />
 
-      {/* Answer timer ring (when answering) */}
-      {s.ask && s.zone === 'opts' && (
-        <TimerRing
-          secs={s.ask.secs}
-          timerKey={s.ask.key}
-          position={[0, 5, 2]}
-          radius={1.5}
-        />
-      )}
+      {/* Answer timer ring */}
+      <TimerRing
+        secs={showOpts && s.ask ? s.ask.secs : 0}
+        timerKey={s.ask?.key ?? 0}
+        position={[0, 5, 2]}
+        radius={1.5}
+      />
 
       {/* Stamp burst */}
       <StampBurst stamp={s.stamp} teamColor={teamColor(s.stamp?.team ?? 'you')} />
 
-      {/* Rival bubble — visible in rival zone */}
-      <RivalBubble rivalView={s.rivalView} visible={s.zone === 'rival'} />
+      {/* Rival bubble — stays mounted, visibility controlled via prop */}
+      <RivalBubble rivalView={s.rivalView} visible={showRival} />
 
       {/* Progress pips */}
       <PipTrack total={s.total} took={s.took} qi={s.qi} progress={progress} />
     </>
   );
-}
+});

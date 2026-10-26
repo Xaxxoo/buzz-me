@@ -11,9 +11,10 @@ interface BuzzerDomeProps {
   buzzLive: boolean;
   onBuzz: () => void;
   progress: MutableRefObject<number>;
+  visible?: boolean;
 }
 
-export function BuzzerDome({ buzzLive, onBuzz, progress }: BuzzerDomeProps) {
+export function BuzzerDome({ buzzLive, onBuzz, progress, visible = true }: BuzzerDomeProps) {
   const groupRef = useRef<THREE.Group>(null);
   const domeRef = useRef<THREE.Mesh>(null);
   const ringRef = useRef<THREE.Mesh>(null);
@@ -61,6 +62,8 @@ export function BuzzerDome({ buzzLive, onBuzz, progress }: BuzzerDomeProps) {
   useFrame(() => {
     const g = groupRef.current;
     if (!g) return;
+    g.visible = visible;
+    if (!visible) return;
     // Phase 1: 0 → 0.4
     const p = Math.min(progress.current / 0.4, 1);
     g.scale.set(p || 0.001, p || 0.001, p || 0.001);
