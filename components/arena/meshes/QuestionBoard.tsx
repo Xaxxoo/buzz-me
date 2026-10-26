@@ -1,10 +1,9 @@
 'use client';
 
-import { useRef, type MutableRefObject } from 'react';
+import { useRef, useMemo, useEffect, type MutableRefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { QUESTION_BOARD_POS, BOARD_WIDTH, BOARD_HEIGHT } from '../shared/constants';
-import { useCanvasTexture } from '../hooks/useCanvasTexture';
 import type { WordView } from '@/lib/engine';
 
 interface QuestionBoardProps {
@@ -16,79 +15,110 @@ interface QuestionBoardProps {
   progress: MutableRefObject<number>;
 }
 
+const TEX_W = 800;
+const TEX_H = 300;
+
+/**
+ * Redraws the question board canvas in-place — no texture recreation.
+ * Called whenever the text content changes (tracked via a ref comparison).
+ */
+function redraw(
+  ctx: CanvasRenderingContext2D,
+  tag: string,
+  visibleText: string,
+  answer: string | null,
+  bonusCard: boolean,
+) {
+  ctx.clearRect(0, 0, TEX_W, TEX_H);
+
+  // Background
+  ctx.fillStyle = bonusCard ? 'rgba(198,244,50,0.08)' : 'rgba(10,10,9,0.92)';
+  ctx.beginPath();
+  ctx.roundRect(0, 0, TEX_W, TEX_H, 16);
+  ctx.fill();
+
+  // Bonus border glow
+  if (bonusCard) {
+    ctx.strokeStyle = 'rgba(198,244,50,0.4)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(2, 2, TEX_W - 4, TEX_H - 4, 14);
+    ctx.stroke();
+  }
+
+  // Category tag
+  ctx.font = '500 18px Inter Tight, system-ui, sans-serif';
+  ctx.fillStyle = '#9ca3af';
+  ctx.textAlign = 'center';
+  ctx.fillText(tag, TEX_W / 2, 32);
+
+  // Question text with word wrap
+  ctx.font = '600 26px Inter Tight, system-ui, sans-serif';
+  ctx.fillStyle = '#f0ebe3';
+  ctx.textAlign = 'center';
+
+  const maxWidth = TEX_W - 60;
+  const lineHeight = 34;
+  const wordsArr = visibleText.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+
+  for (const word of wordsArr) {
+    const test = currentLine ? currentLine + ' ' + word : word;
+    if (ctx.measureText(test).width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = test;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+
+  const startY = 80;
+  const maxLines = Math.min(lines.length, 5);
+  for (let i = 0; i < maxLines; i++) {
+    ctx.fillText(lines[i], TEX_W / 2, startY + i * lineHeight);
+  }
+
+  // Answer text
+  if (answer) {
+    const ansY = startY + maxLines * lineHeight + 20;
+    ctx.font = '500 22px Inter Tight, system-ui, sans-serif';
+    ctx.fillStyle = '#22c55e';
+    ctx.fillText('Answer: ' + answer, TEX_W / 2, ansY);
+  }
+}
+
 export function QuestionBoard({ tag, words, visibleCount, answer, bonusCard, progress }: QuestionBoardProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const lastDrawn = useRef('');
 
-  // Build the visible text string — words don't include trailing spaces
-  const visibleText = words
-    .slice(0, visibleCount)
-    .map(w => w.text)
-    .join(' ');
+  // Persistent canvas + texture — created once, redrawn in-place
+  const { canvas, ctx, texture } = useMemo(() => {
+    const c = document.createElement('canvas');
+    c.width = TEX_W * 2;
+    c.height = TEX_H * 2;
+    const cx = c.getContext('2d')!;
+    cx.scale(2, 2);
+    const tex = new THREE.CanvasTexture(c);
+    return { canvas: c, ctx: cx, texture: tex };
+  }, []);
 
-  // Question text texture
-  const { texture: qTex, aspect: qAspect } = useCanvasTexture((ctx, canvas) => {
-    const w = 800;
-    const h = 300;
-    if (canvas.width > 0) {
-      // Background
-      ctx.fillStyle = bonusCard ? 'rgba(198,244,50,0.08)' : 'rgba(10,10,9,0.92)';
-      ctx.beginPath();
-      ctx.roundRect(0, 0, w, h, 16);
-      ctx.fill();
+  // Dispose texture on unmount
+  useEffect(() => () => { texture.dispose(); }, [texture]);
 
-      // Bonus border glow
-      if (bonusCard) {
-        ctx.strokeStyle = 'rgba(198,244,50,0.4)';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.roundRect(2, 2, w - 4, h - 4, 14);
-        ctx.stroke();
-      }
+  // Redraw only when content actually changes
+  const visibleText = words.slice(0, visibleCount).map(w => w.text).join(' ');
+  const drawKey = `${tag}|${visibleText}|${answer ?? ''}|${bonusCard}`;
 
-      // Category tag
-      ctx.font = '500 18px Inter Tight, system-ui, sans-serif';
-      ctx.fillStyle = '#9ca3af';
-      ctx.textAlign = 'center';
-      ctx.fillText(tag, w / 2, 32);
-
-      // Question text with word wrap
-      ctx.font = '600 26px Inter Tight, system-ui, sans-serif';
-      ctx.fillStyle = '#f0ebe3';
-      ctx.textAlign = 'center';
-
-      const maxWidth = w - 60;
-      const lineHeight = 34;
-      const wordsArr = visibleText.split(' ');
-      const lines: string[] = [];
-      let currentLine = '';
-
-      for (const word of wordsArr) {
-        const test = currentLine ? currentLine + ' ' + word : word;
-        if (ctx.measureText(test).width > maxWidth && currentLine) {
-          lines.push(currentLine);
-          currentLine = word;
-        } else {
-          currentLine = test;
-        }
-      }
-      if (currentLine) lines.push(currentLine);
-
-      const startY = 80;
-      const maxLines = Math.min(lines.length, 5);
-      for (let i = 0; i < maxLines; i++) {
-        ctx.fillText(lines[i], w / 2, startY + i * lineHeight);
-      }
-
-      // Answer text
-      if (answer) {
-        const ansY = startY + maxLines * lineHeight + 20;
-        ctx.font = '500 22px Inter Tight, system-ui, sans-serif';
-        ctx.fillStyle = '#22c55e';
-        ctx.fillText('Answer: ' + answer, w / 2, ansY);
-      }
-    }
-    return { w, h };
-  }, [tag, visibleText, answer, bonusCard]);
+  if (drawKey !== lastDrawn.current) {
+    lastDrawn.current = drawKey;
+    ctx.save();
+    ctx.setTransform(2, 0, 0, 2, 0, 0); // reset to 2x scale
+    redraw(ctx, tag, visibleText, answer, bonusCard);
+    ctx.restore();
+    texture.needsUpdate = true;
+  }
 
   useFrame(() => {
     const g = groupRef.current;
@@ -100,24 +130,22 @@ export function QuestionBoard({ tag, words, visibleCount, answer, bonusCard, pro
     }
     g.visible = true;
     const p = Math.min((progress.current - 0.4) / 0.3, 1);
-    const yOff = (1 - p) * 4; // slides down 4 units
+    const yOff = (1 - p) * 4;
     g.position.set(QUESTION_BOARD_POS[0], QUESTION_BOARD_POS[1] + yOff, QUESTION_BOARD_POS[2]);
   });
 
+  const aspect = TEX_W / TEX_H;
   const boardH = BOARD_HEIGHT;
-  const boardW = boardH * qAspect;
+  const boardW = boardH * aspect;
 
   return (
     <group ref={groupRef} position={QUESTION_BOARD_POS} visible={false}>
-      {/* Board background panel */}
       <mesh>
         <planeGeometry args={[BOARD_WIDTH, BOARD_HEIGHT]} />
         <meshPhysicalMaterial color="#111110" transparent opacity={0.85} roughness={0.1} metalness={0.2} clearcoat={0.3} />
       </mesh>
-
-      {/* Question texture overlay */}
       <sprite position={[0, 0, 0.05]} scale={[boardW, boardH, 1]}>
-        <spriteMaterial map={qTex} transparent depthTest={false} />
+        <spriteMaterial map={texture} transparent depthTest={false} />
       </sprite>
     </group>
   );
