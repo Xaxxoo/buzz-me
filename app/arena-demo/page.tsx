@@ -65,7 +65,7 @@ const base: GameState = {
   zone: 'buzz', buzzLive: true, window: { key: 1, secs: 10 },
   ask: null, rivalView: null,
   seat: { key: 1, team: 'you', idx: 1 }, flash: null,
-  result: null, resultKey: 0,
+  result: null, resultKey: 0, reviewRounds: [],
   save: EMPTY_SAVE,
   selectedCategories: [], difficulty: 'medium',
   matchMode: 'local', matchId: null, finding: false, findElapsed: 0, botOffer: false, opponentName: null,
