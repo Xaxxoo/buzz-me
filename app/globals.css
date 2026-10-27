@@ -134,7 +134,7 @@
   .vs-wrap { position: relative; width: 100%; }
   .art-buzzer { display: none; }
   .eyebrow { margin: 0; font: 700 11px/1 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: color-mix(in srgb, var(--color-ink) 86%, transparent); }
-  .logo { margin: 0; padding-inline: .12em; font: 900 clamp(56px,18vw,124px)/.86 var(--font-display); letter-spacing: -.055em; color: var(--color-sun); animation: logo-in .6s var(--ease-out) both; overflow: visible; }
+  .logo { margin: 0; padding-inline: .12em; font: 900 clamp(56px,15vw,124px)/.86 var(--font-display); letter-spacing: -.055em; color: var(--color-sun); animation: logo-in .6s var(--ease-out) both; overflow: visible; }
   .lede { margin: 0; max-width: 30ch; font: 500 16px/1.4 var(--font-body); text-wrap: balance; color: color-mix(in srgb, var(--color-ink) 82%, transparent); }
 
   .playing-for { display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 12px 4px 6px; border: 1px solid var(--color-border); border-radius: 99px; background: var(--color-glass); font: 500 13px/1 var(--font-body); color: var(--color-muted); cursor: pointer; transition: border-color .15s ease, transform .12s var(--ease-out); }
@@ -587,7 +587,7 @@
   .title { gap: 16px; padding-bottom: 12px; }
   .title .lede, .title .playing-for.hint { display: none; }
   .title .hero { gap: 8px; padding-top: 0; }
-  .title .logo { font-size: clamp(60px, 20vw, 84px); }
+  .title .logo { font-size: clamp(56px, 15vw, 84px); }
   .title .dome.big { width: 148px; height: 148px; }
   .title .dome.big .base { height: 135px; }
   .title .dome.big .cap, .title .dome.big.live::after { height: 130px; }
