@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties }
 import { Backdrop } from '@/components/Backdrop';
 import { Leaderboard } from '@/components/screens/Leaderboard';
 import { Login } from '@/components/screens/Login';
-import { ArenaMatch as Match } from '@/components/arena/ArenaMatch';
+import { Match } from '@/components/screens/Match';
 import { Menu } from '@/components/screens/Menu';
 import { Picker } from '@/components/screens/Picker';
 import { Result } from '@/components/screens/Result';
