@@ -365,10 +365,12 @@
   .lb-tab + .lb-tab { border-left: 1px solid var(--color-border); }
   .lb-tab.active { background: var(--color-sun); color: #0a0a09; }
   .lb-row { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 8px; min-height: 46px; padding: 8px 12px; background: var(--color-glass); backdrop-filter: blur(12px); border: 1px solid var(--color-border); border-radius: 14px; }
-  .lb-row:has(.lb-uni-badge) { grid-template-columns: 32px auto 1fr auto; }
+  .lb-uni-row { grid-template-columns: 32px auto 1fr auto; }
   .lb-row.lb-own { border-color: var(--color-sun); box-shadow: 0 0 15px var(--color-glow); position: sticky; bottom: 0; background: var(--color-glass); }
   .lb-rank { font: 900 16px/1 var(--font-display); text-align: center; }
   .lb-uni-badge { padding: 4px 8px; border-radius: 8px; font: 800 11px/1 var(--font-display); color: #fff; text-align: center; white-space: nowrap; }
+  .lb-uni-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .lb-uni-meta { font: 500 11px/1 var(--font-body); color: var(--color-muted); }
   .lb-name { font: 600 15px/1.2 var(--font-body); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lb-rating { font: 700 14px/1 var(--font-display); font-variant-numeric: tabular-nums; }
   .lb-more { align-self: center; min-height: 40px; }

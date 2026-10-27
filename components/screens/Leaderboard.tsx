@@ -21,6 +21,8 @@ interface UniversityRow {
   points: number;
   color_a: string;
   color_b: string;
+  player_count?: number;
+  total_wins?: number;
 }
 
 interface OwnRank {
@@ -181,10 +183,13 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
             </div>
           )}
           {universities.map((u, i) => (
-            <div className="lb-row" key={u.id}>
+            <div className="lb-row lb-uni-row" key={u.id}>
               <span className="lb-rank">{u.rank || i + 1 + (uniPage - 1) * 20}</span>
               <span className="lb-uni-badge" style={{ background: u.color_a || 'var(--color-glass)' }}>{u.short_name}</span>
-              <span className="lb-name">{u.name}</span>
+              <div className="lb-uni-info">
+                <span className="lb-name">{u.name}</span>
+                <span className="lb-uni-meta">{u.player_count ?? 0} player{u.player_count === 1 ? '' : 's'} · {u.total_wins ?? 0} win{u.total_wins === 1 ? '' : 's'}</span>
+              </div>
               <span className="lb-rating">{u.points} pts</span>
             </div>
           ))}
