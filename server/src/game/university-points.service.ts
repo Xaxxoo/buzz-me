@@ -19,10 +19,10 @@ export class UniversityPointsService {
     return new Date().toISOString().slice(0, 10);
   }
 
-  /** Award points to a university after a ranked match. Skips unverified players. Enforces daily cap. */
+  /** Award points to a university after a ranked match. Verified players earn more. Enforces daily cap. */
   async awardMatchPoints(userId: string, universityId: string | null, verified: boolean, won: boolean) {
-    if (!verified || !universityId) return;
-    const pts = won ? 3 : 1;
+    if (!universityId) return;
+    const pts = verified ? (won ? 3 : 1) : (won ? 2 : 1);
     const awarded = await this.awardWithCap(userId, universityId, pts);
     if (awarded > 0) {
       this.logger.log(`Awarded ${awarded} match pts to university ${universityId} (user ${userId}, ${won ? 'win' : 'loss'})`);
