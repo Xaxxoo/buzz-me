@@ -8,6 +8,7 @@ import { ArenaMatch as Match } from '@/components/arena/ArenaMatch';
 import { Menu } from '@/components/screens/Menu';
 import { Picker } from '@/components/screens/Picker';
 import { Result } from '@/components/screens/Result';
+import { Review } from '@/components/screens/Review';
 import { Signup } from '@/components/screens/Signup';
 import { Stats } from '@/components/screens/Stats';
 import { Team } from '@/components/screens/Team';
@@ -67,6 +68,7 @@ export default function Game({ joinCode }: { joinCode?: string } = {}) {
       const scr = engine.getSnapshot().screen;
       if (scr === 's-title') return;
       if (scr === 's-match' || scr === 's-vs') { history.pushState({ quad: 1 }, ''); return; }
+      if (scr === 's-review') { engine.backToResult(); history.pushState({ quad: 1 }, ''); return; }
       engine.menu();
     };
     window.addEventListener('popstate', onPop);
@@ -393,7 +395,12 @@ export default function Game({ joinCode }: { joinCode?: string } = {}) {
         <Result
           active={s.screen === 's-result'} result={s.result} resultKey={s.resultKey}
           authStatus={authState.status}
-          onAgain={() => engine.rematch()} onMenu={() => engine.menu()} onSignup={() => engine.showSignup()}
+          onAgain={() => engine.rematch()} onReview={() => engine.showReview()} onMenu={() => engine.menu()} onSignup={() => engine.showSignup()}
+        />
+        <Review
+          active={s.screen === 's-review'} rounds={s.reviewRounds}
+          mode={s.mode} you={s.you} rival={s.rival}
+          onBack={() => engine.backToResult()}
         />
         <Login active={s.screen === 's-login'} auth={auth} onSignup={() => engine.showSignup()} onMenu={() => engine.menu()} />
         <Signup active={s.screen === 's-signup'} auth={auth} onLogin={() => engine.showLogin()} onMenu={() => engine.menu()} />

@@ -15,12 +15,13 @@ interface Props {
   resultKey: number;
   authStatus: AuthStatus;
   onAgain: () => void;
+  onReview: () => void;
   onMenu: () => void;
   onSignup: () => void;
 }
 
 /* Remounted for every new result (key), so the scores count up from zero and the share menu resets. */
-function Card({ result, authStatus, onAgain, onMenu, onSignup }: { result: MatchResult | DailyResult; authStatus: AuthStatus; onAgain: () => void; onMenu: () => void; onSignup: () => void }) {
+function Card({ result, authStatus, onAgain, onReview, onMenu, onSignup }: { result: MatchResult | DailyResult; authStatus: AuthStatus; onAgain: () => void; onReview: () => void; onMenu: () => void; onSignup: () => void }) {
   const daily = result.kind === 'daily';
   const mine = useCountUp(daily ? result.score : result.scoreYou, 900, 0);
   const theirs = useCountUp(daily ? 0 : result.scoreRival, 900, 0);
@@ -73,8 +74,9 @@ function Card({ result, authStatus, onAgain, onMenu, onSignup }: { result: Match
         {!daily && <p className="rate" id="rate">{result.rate}</p>}
         <p className="dare" id="dare">{result.dare}</p>
       </div>
-      <div className="actions grid grid-cols-2 gap-2.5">
+      <div className="actions grid grid-cols-3 gap-2.5">
         <button className="btn" id="again" type="button" onClick={onAgain}>{daily ? 'Play a match' : 'Rematch'}</button>
+        <button className="btn ghost" id="review" type="button" onClick={onReview}>Review</button>
         <button className="btn ghost" id="share" type="button" onClick={onShare}>Share</button>
         <button className="btn ghost" id="to-menu" type="button" onClick={onMenu}>Menu</button>
       </div>
@@ -93,10 +95,10 @@ function Card({ result, authStatus, onAgain, onMenu, onSignup }: { result: Match
   );
 }
 
-export function Result({ active, result, resultKey, authStatus, onAgain, onMenu, onSignup }: Props) {
+export function Result({ active, result, resultKey, authStatus, onAgain, onReview, onMenu, onSignup }: Props) {
   return (
     <section className={'screen result enter flex-auto min-h-0 flex flex-col gap-3 justify-center' + (result?.kind === 'daily' ? ' daily' : '')} id="s-result" hidden={!active}>
-      {result && <Card key={resultKey} result={result} authStatus={authStatus} onAgain={onAgain} onMenu={onMenu} onSignup={onSignup} />}
+      {result && <Card key={resultKey} result={result} authStatus={authStatus} onAgain={onAgain} onReview={onReview} onMenu={onMenu} onSignup={onSignup} />}
     </section>
   );
 }
