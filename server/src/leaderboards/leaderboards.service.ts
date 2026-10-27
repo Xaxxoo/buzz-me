@@ -227,19 +227,57 @@ export class LeaderboardsService {
   async getUniversityBoard(dto: LeaderboardQueryDto) {
     const { page = 1, limit = 20 } = dto;
 
-    const qb = this.universityRepo
+    // Count active universities (with players) via a subquery
+    const activeQb = this.universityRepo
       .createQueryBuilder('u')
-      .select(['u.id', 'u.name', 'u.short_name', 'u.country', 'u.points', 'u.color_a', 'u.color_b', 'u.pattern'])
+      .innerJoin(User, 'p', 'p.university_id = u.id')
+      .select('u.id', 'id')
+      .addSelect('u.name', 'name')
+      .addSelect('u.short_name', 'short_name')
+      .addSelect('u.country', 'country')
+      .addSelect('u.points', 'points')
+      .addSelect('u.color_a', 'color_a')
+      .addSelect('u.color_b', 'color_b')
+      .addSelect('u.pattern', 'pattern')
+      .addSelect('COUNT(p.id)::int', 'player_count')
+      .addSelect('COALESCE(SUM(p.matches_won), 0)::int', 'total_wins')
+      .groupBy('u.id')
+      .addGroupBy('u.name')
+      .addGroupBy('u.short_name')
+      .addGroupBy('u.country')
+      .addGroupBy('u.points')
+      .addGroupBy('u.color_a')
+      .addGroupBy('u.color_b')
+      .addGroupBy('u.pattern')
       .orderBy('u.points', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
+      .addOrderBy('"total_wins"', 'DESC')
+      .addOrderBy('"player_count"', 'DESC')
+      .offset((page - 1) * limit)
+      .limit(limit);
 
-    const [items, total] = await qb.getManyAndCount();
+    const raw = await activeQb.getRawMany();
+
+    // Total count of universities that have at least one player
+    const countResult = await this.universityRepo
+      .createQueryBuilder('u')
+      .innerJoin(User, 'p', 'p.university_id = u.id')
+      .select('COUNT(DISTINCT u.id)::int', 'total')
+      .getRawOne();
+    const total = countResult?.total ?? 0;
 
     return {
-      items: items.map((u, i) => ({
+      items: raw.map((u, i) => ({
         rank: (page - 1) * limit + i + 1,
-        ...u,
+        id: u.id,
+        name: u.name,
+        short_name: u.short_name,
+        country: u.country,
+        points: Number(u.points),
+        color_a: u.color_a,
+        color_b: u.color_b,
+        pattern: u.pattern,
+        player_count: Number(u.player_count),
+        total_wins: Number(u.total_wins),
       })),
       total,
       page,
