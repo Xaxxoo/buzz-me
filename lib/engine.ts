@@ -20,13 +20,32 @@ import type { CampusLayout3D } from './campus-types';
  * from a room server and keep the rest.
  */
 
-export type Screen = 's-title' | 's-pick' | 's-vs' | 's-match' | 's-result' | 's-stats' | 's-login' | 's-signup' | 's-leaderboard' | 's-team' | 's-challenges' | 's-uni-profile';
+export type Screen = 's-title' | 's-pick' | 's-vs' | 's-match' | 's-result' | 's-review' | 's-stats' | 's-login' | 's-signup' | 's-leaderboard' | 's-team' | 's-challenges' | 's-uni-profile';
 export type Took = 'you' | 'rival' | 'none';
 
 export interface WordView { text: string; late: boolean; delay?: number }
 export interface OptionView { text: string; mark: '' | 'right' | 'wrong' | 'struck'; disabled: boolean }
 export interface AskView { key: number; secs: number; paused: boolean; options: OptionView[] }
 export interface RivalView { small: string; big: string | null; mark: '' | 'right' | 'wrong' }
+
+export interface ReviewRound {
+  round: number;
+  category: string;
+  questionText: string;
+  options: string[];
+  correctAnswer: string;
+  yourPick: string | null;
+  yourCorrect: boolean | null;
+  took: Took;
+  bonus: {
+    questionText: string;
+    options: string[];
+    correctAnswer: string;
+    forTeam: Team;
+    yourPick: string | null;
+    correct: boolean | null;
+  } | null;
+}
 
 export interface MatchResult {
   kind: 'match';
@@ -79,6 +98,7 @@ export interface GameState {
   flash: { key: number; team: Team } | null;
   result: MatchResult | DailyResult | null;
   resultKey: number;
+  reviewRounds: ReviewRound[];
   save: Save;
   /* categories & difficulty */
   selectedCategories: string[];
@@ -148,7 +168,7 @@ const initial = (): GameState => ({
   total: ROUNDS, qi: 0, scoreYou: 0, scoreRival: 0, took: [], dayLabel: '',
   tag: '', bonusCard: false, words: [], visibleCount: 0, buzzedAtWord: -1, answer: null, stamp: null, status: '',
   zone: 'buzz', buzzLive: false, window: { key: 0, secs: 0 }, ask: null, rivalView: null, seat: null, flash: null,
-  result: null, resultKey: 0,
+  result: null, resultKey: 0, reviewRounds: [],
   save: defaultSave(),
   selectedCategories: [], difficulty: 'medium',
   matchMode: 'local', matchId: null, finding: false, findElapsed: 0, botOffer: false, opponentName: null,
@@ -194,6 +214,9 @@ export class GameEngine {
   private asking: { qa: QA; done: (ok: boolean, text: string | null) => void; over: boolean } | null = null;
   private mySide: 'a' | 'b' = 'a';
   private findTimer: ReturnType<typeof setInterval> | null = null;
+  /* review data collection */
+  private pendingRound: Partial<ReviewRound> | null = null;
+  private pendingBonus: any = null;
   /* time-based word reveal */
   private revealStartTime = 0;
   private revealInterval = 400;
@@ -477,8 +500,10 @@ export class GameEngine {
   private resetBoard(mode: 'match' | 'daily', total: number, rival: School | null) {
     this.tally = { won: 0, bonus: 0, best: null };
     this.marks = [];
+    this.pendingRound = null;
+    this.pendingBonus = null;
     this.set({
-      boardKey: this.key(), mode, rival, total, qi: 0, scoreYou: 0, scoreRival: 0, took: [],
+      boardKey: this.key(), mode, rival, total, qi: 0, scoreYou: 0, scoreRival: 0, took: [], reviewRounds: [],
       tag: '', bonusCard: false, words: [], visibleCount: 0, buzzedAtWord: -1, answer: null, stamp: null, status: '',
       zone: 'buzz', buzzLive: false, ask: null, rivalView: null, seat: null,
     });
@@ -544,6 +569,8 @@ export class GameEngine {
     const q = (this.q = this.qs[qi]);
     this.all = (q.t || '').trim().replace(/\s+/g, ' ').split(' ').filter(w => w.length > 0);
     this.ri = 0; this.full = false; this.early = false; this.phase = 'reading';
+    this.pendingRound = { round: qi + 1, category: q.c, questionText: q.t, options: q.o.slice(), correctAnswer: q.o[0], yourPick: null, yourCorrect: null };
+    this.pendingBonus = null;
     const daily = this.state.mode === 'daily';
     this.set({
       tag: q.c, bonusCard: false, words: [], visibleCount: 0, buzzedAtWord: -1, answer: null, stamp: null,
@@ -590,7 +617,19 @@ export class GameEngine {
     }, OPEN_MS);
   }
 
-  private advance() { this.set({ qi: this.state.qi + 1 }); this.nextQuestion(); }
+  private advance() {
+    if (this.pendingRound) {
+      this.pendingRound.took = this.state.took[this.state.qi] ?? 'none';
+      this.pendingRound.bonus = this.pendingBonus ? {
+        questionText: this.pendingBonus.questionText, options: this.pendingBonus.options,
+        correctAnswer: this.pendingBonus.correctAnswer, forTeam: this.pendingBonus.forTeam,
+        yourPick: this.pendingBonus.yourPick, correct: this.pendingBonus.correct,
+      } : null;
+      this.set({ reviewRounds: [...this.state.reviewRounds, this.pendingRound as ReviewRound] });
+      this.pendingRound = null; this.pendingBonus = null;
+    }
+    this.set({ qi: this.state.qi + 1 }); this.nextQuestion();
+  }
 
   /** The player hit the buzzer. */
   buzz() {
@@ -616,6 +655,7 @@ export class GameEngine {
   private tossResult = (ok: boolean, text: string | null) => {
     const q = this.q!, rival = this.state.rival;
     if (!rival) return;
+    if (this.pendingRound) { this.pendingRound.yourPick = text; this.pendingRound.yourCorrect = ok; }
     record(this.save, q.c, ok); this.commit();
     if (ok) {
       const pts = this.early ? 15 : 10;
@@ -688,6 +728,7 @@ export class GameEngine {
 
   private stealResult = (ok: boolean, text: string | null) => {
     const q = this.q!;
+    if (this.pendingRound) { this.pendingRound.yourPick = text; this.pendingRound.yourCorrect = ok; }
     record(this.save, q.c, ok); this.commit();
     if (ok) {
       this.score('you', 10); this.took('you'); this.tally.won++;
@@ -707,6 +748,7 @@ export class GameEngine {
     const q = this.q!, b = q.b, school = team === 'you' ? this.state.you : this.state.rival;
     if (!school) return;
     const name = school.short;
+    this.pendingBonus = { questionText: b.t, options: b.o.slice(), correctAnswer: b.o[0], forTeam: team, yourPick: null, correct: null };
     this.set({
       bonusCard: true, tag: 'Bonus for ' + name, answer: null,
       words: (b.t || '').trim().replace(/\s+/g, ' ').split(' ').filter(w => w.length > 0).map((text, i) => ({ text, late: false, delay: i * 25 })),
@@ -716,6 +758,7 @@ export class GameEngine {
       this.later(() => this.ask(b, {
         secs: 8,
         done: (ok, text) => {
+          if (this.pendingBonus) { this.pendingBonus.yourPick = text; this.pendingBonus.correct = ok; }
           record(this.save, q.c, ok); this.commit();
           if (ok) { this.score('you', 10); this.tally.bonus++; sfx.right(); this.cheer(30); this.status('Bonus taken. +10.'); }
           else { this.markRight(b); sfx.wrong(); this.status(text === null ? 'Out of time on the bonus.' : 'Bonus missed.'); }
@@ -727,7 +770,9 @@ export class GameEngine {
       this.rivalPanel(name + ' takes the bonus');
       this.status(`Bonus question for ${name}.`);
       this.later(() => {
-        if (Math.random() < this.botParams().bonusChance) { this.score('rival', 10); this.rivalPanel(name + ' answers', b.o[0], 'right'); sfx.theirs(); this.status(`${name} takes the bonus. +10 to them.`); }
+        const rivalCorrect = Math.random() < this.botParams().bonusChance;
+        if (this.pendingBonus) this.pendingBonus.correct = rivalCorrect;
+        if (rivalCorrect) { this.score('rival', 10); this.rivalPanel(name + ' answers', b.o[0], 'right'); sfx.theirs(); this.status(`${name} takes the bonus. +10 to them.`); }
         else { this.rivalPanel(name + ' answers', pick(b.o.slice(1)), 'wrong'); sfx.tap(); this.status(`${name} misses the bonus.`); }
         this.showAnswer(b);
         this.later(() => this.advance(), 2000);
@@ -738,6 +783,7 @@ export class GameEngine {
   /* ---------- daily challenge ---------- */
   private dailyAnswer = (ok: boolean, text: string | null) => {
     const q = this.q!;
+    if (this.pendingRound) { this.pendingRound.yourPick = text; this.pendingRound.yourCorrect = ok; }
     record(this.save, q.c, ok); this.commit();
     if (ok) {
       const pts = 10 + Math.round((1 - this.heard) * 10);
@@ -856,10 +902,11 @@ export class GameEngine {
       ? { id: opp.username, name: opp.university.name, country: '', short: opp.university.short_name, a: opp.university.color_a, b: opp.university.color_b, pat: opp.university.pattern as any }
       : { id: opp.username, name: opp.username, country: '', short: opp.username.slice(0, 10), a: '#1763B8', b: '#0E4D8E', pat: 'chief' };
     this.tally = { won: 0, bonus: 0, best: null };
+    this.pendingRound = null; this.pendingBonus = null;
     this.set({
       finding: false, privateWaiting: false, privateCode: null,
       matchMode: 'online', matchId: data.match_id, opponentName: opp.username,
-      rival, screen: 's-vs',
+      rival, screen: 's-vs', reviewRounds: [],
     });
     sfx.slam(); setTimeout(() => sfx.slam(), 180);
   }
@@ -881,6 +928,8 @@ export class GameEngine {
     this.rivalPlan = null;
     this.revealStartTime = data.revealStartTime;
     this.revealInterval = data.wordIntervalMs || 400;
+    this.pendingRound = { round: data.round, category: data.category, questionText: data.words.join(' '), options: [], correctAnswer: '', yourPick: null, yourCorrect: null };
+    this.pendingBonus = null;
 
     // All words in DOM from the start, visibility controlled by visibleCount
     const wordViews: WordView[] = this.all.map(text => ({ text, late: false }));
@@ -931,6 +980,7 @@ export class GameEngine {
   }
 
   onlineAsk(data: { options: string[]; seconds: number; struck?: string }) {
+    if (this.pendingRound && !this.pendingRound.options?.length) this.pendingRound.options = data.options.slice();
     this.phase = 'answer';
     this.asking = {
       qa: { t: '', o: data.options },
@@ -952,6 +1002,8 @@ export class GameEngine {
 
   onlineAnswerResult(data: { correct: boolean; correct_answer: string; points: number; score_a: number; score_b: number; remaining_words?: string[] }) {
     this.cut();
+    if (this.pendingRound) { this.pendingRound.correctAnswer = data.correct_answer; }
+    if (this.phase === 'answer' && this.pendingRound) { this.pendingRound.yourCorrect = data.correct; }
     const myScore = this.mySide === 'a' ? data.score_a : data.score_b;
     const theirScore = this.mySide === 'a' ? data.score_b : data.score_a;
     this.set({ scoreYou: myScore, scoreRival: theirScore });
@@ -989,6 +1041,7 @@ export class GameEngine {
     this.stopRevealLoop();
     this.phase = 'bonus';
     const forMe = data.for_side === this.mySide;
+    this.pendingBonus = { questionText: data.text, options: data.options.slice(), correctAnswer: '', forTeam: forMe ? 'you' : 'rival', yourPick: null, correct: null };
     const name = forMe ? (this.state.you?.short ?? 'You') : (this.state.opponentName ?? 'Opponent');
     const bonusWords = (data.text || '').trim().replace(/\s+/g, ' ').split(' ').filter(w => w.length > 0);
     this.all = bonusWords;
@@ -1009,6 +1062,7 @@ export class GameEngine {
   onlineBonusResult(data: { correct: boolean; correct_answer: string; points: number; score_a: number; score_b: number }) {
     if (this.phase === 'idle' || this.phase === 'done') return;
     this.cut();
+    if (this.pendingBonus) { this.pendingBonus.correctAnswer = data.correct_answer; this.pendingBonus.correct = data.correct; }
     const myScore = this.mySide === 'a' ? data.score_a : data.score_b;
     const theirScore = this.mySide === 'a' ? data.score_b : data.score_a;
     this.set({ scoreYou: myScore, scoreRival: theirScore, answer: data.correct_answer });
@@ -1041,6 +1095,16 @@ export class GameEngine {
     this.set({ scoreYou: myScore, scoreRival: theirScore });
     const t = data.took === this.mySide ? 'you' as const : data.took === 'none' ? 'none' as const : 'rival' as const;
     this.took(t);
+    if (this.pendingRound) {
+      this.pendingRound.took = t;
+      this.pendingRound.bonus = this.pendingBonus ? {
+        questionText: this.pendingBonus.questionText, options: this.pendingBonus.options,
+        correctAnswer: this.pendingBonus.correctAnswer, forTeam: this.pendingBonus.forTeam,
+        yourPick: this.pendingBonus.yourPick, correct: this.pendingBonus.correct,
+      } : null;
+      this.set({ reviewRounds: [...this.state.reviewRounds, this.pendingRound as ReviewRound] });
+      this.pendingRound = null; this.pendingBonus = null;
+    }
   }
 
   onlineMatchEnd(data: { match_id: string; score_a: number; score_b: number; rating_before: number; rating_after: number; rating_delta: number; rounds_won: number; total_rounds: number }) {
@@ -1115,6 +1179,9 @@ export class GameEngine {
     if (!view || this.asking?.over) return;
     const opt = view.options[index];
     if (!opt || opt.disabled) return;
+    const pickText = opt.text;
+    if (this.phase === 'bonus' && this.pendingBonus) { this.pendingBonus.yourPick = pickText; }
+    else if (this.pendingRound) { this.pendingRound.yourPick = pickText; }
     if (this.asking) this.asking.over = true;
     this.set({
       ask: { ...view, paused: true, options: view.options.map((o, i) => ({ ...o, disabled: true, mark: i === index ? 'wrong' as const : o.mark })) },
@@ -1174,6 +1241,9 @@ export class GameEngine {
     else if (d < 0) sfx.lose();
     else sfx.theirs();
   }
+  /* ---------- review ---------- */
+  showReview() { sfx.tap(); this.set({ screen: 's-review' }); }
+  backToResult() { sfx.tap(); this.set({ screen: 's-result' }); }
 }
 
 /** The text copied from the result card. */
