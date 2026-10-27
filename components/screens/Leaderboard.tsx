@@ -174,13 +174,26 @@ export function Leaderboard({ active, auth, authStatus, onMenu }: Props) {
 
       {tab === 'universities' && (
         <div className="lb-list flex-auto min-h-0 overflow-y-auto flex flex-col gap-2 pb-2">
-          {universities.map(u => (
+          {error && (
+            <div className="flex flex-col items-center gap-2 py-4">
+              <p style={{ font: '600 14px/1.3 var(--font-body)', color: 'var(--color-buzz)' }}>{error}</p>
+              <button className="btn ghost small" type="button" onClick={() => fetchUniversities(1, false)}>Retry</button>
+            </div>
+          )}
+          {universities.map((u, i) => (
             <div className="lb-row" key={u.id}>
-              <span className="lb-rank">{u.rank}</span>
+              <span className="lb-rank">{u.rank || i + 1 + (uniPage - 1) * 20}</span>
+              <span className="lb-uni-badge" style={{ background: u.color_a || 'var(--color-glass)' }}>{u.short_name}</span>
               <span className="lb-name">{u.name}</span>
-              <span className="lb-rating">{u.points}</span>
+              <span className="lb-rating">{u.points} pts</span>
             </div>
           ))}
+          {!loading && !error && universities.length === 0 && (
+            <p className="lb-note">No university rankings yet. Play matches to earn points for your school.</p>
+          )}
+          {loading && universities.length === 0 && (
+            <p className="lb-note">Loading\u2026</p>
+          )}
           {universities.length < uniTotal && (
             <button className="btn ghost lb-more" type="button" disabled={loading} onClick={() => fetchUniversities(uniPage + 1, true)}>
               {loading ? 'Loading\u2026' : 'Load more'}
