@@ -618,6 +618,7 @@ export class GameEngine {
   }
 
   private advance() {
+    const patch: Partial<GameState> = { qi: this.state.qi + 1 };
     try {
       if (this.pendingRound) {
         this.pendingRound.took = this.state.took[this.state.qi] ?? 'none';
@@ -629,11 +630,11 @@ export class GameEngine {
           yourPick: this.pendingBonus.yourPick ?? null,
           correct: this.pendingBonus.correct ?? null,
         } : null;
-        this.set({ reviewRounds: [...this.state.reviewRounds, this.pendingRound as ReviewRound] });
+        patch.reviewRounds = [...this.state.reviewRounds, this.pendingRound as ReviewRound];
         this.pendingRound = null; this.pendingBonus = null;
       }
     } catch { this.pendingRound = null; this.pendingBonus = null; }
-    this.set({ qi: this.state.qi + 1 }); this.nextQuestion();
+    this.set(patch); this.nextQuestion();
   }
 
   /** The player hit the buzzer. */
@@ -751,7 +752,7 @@ export class GameEngine {
     this.cut();
     this.phase = 'bonus';
     const q = this.q!, b = q.b, school = team === 'you' ? this.state.you : this.state.rival;
-    if (!school) return;
+    if (!school) { this.later(() => this.advance(), 2000); return; }
     const name = school.short;
     this.pendingBonus = { questionText: b.t, options: b.o.slice(), correctAnswer: b.o[0], forTeam: team, yourPick: null, correct: null };
     this.set({
@@ -1220,7 +1221,7 @@ export class GameEngine {
     this.cut();
     this.phase = 'done';
     const { scoreYou, scoreRival } = this.state, you = this.state.you;
-    if (!you) return;
+    if (!you) { this.set({ screen: 's-title' }); return; }
     if (this.state.mode === 'daily') {
       const froze = bumpStreak(this.save);
       this.save.daily = { date: this.day, score: scoreYou, marks: this.marks, right: this.tally.won, best: this.tally.best, froze };
@@ -1229,7 +1230,7 @@ export class GameEngine {
       return this.showDailyResult(true);
     }
     const rival = this.state.rival;
-    if (!rival) return;
+    if (!rival) { this.set({ screen: 's-title' }); return; }
     const d = scoreYou - scoreRival;
     /* Elo against a fixed 1000-rated bot. */
     const expected = 1 / (1 + Math.pow(10, (1000 - this.save.rating) / 400));
