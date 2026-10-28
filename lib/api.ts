@@ -23,15 +23,24 @@ export interface DbQuestion {
   created_at: string;
 }
 
+/** Reorder options so the correct answer is at index 0 (engine convention). */
+function correctFirst(options: string[], correctIndex: number): string[] {
+  if (correctIndex === 0 || correctIndex >= options.length) return options;
+  const out = options.slice();
+  [out[0], out[correctIndex]] = [out[correctIndex], out[0]];
+  return out;
+}
+
 /** Map a DB question row into the compact frontend Question shape. */
 export function mapQuestion(q: DbQuestion): Question {
+  const opts = correctFirst(q.options, q.correct_option_index);
   return {
     t: q.text,
-    o: q.options,
+    o: opts,
     c: q.category.name,
     b: {
       t: q.bonus_text ?? q.text,
-      o: q.bonus_options ?? q.options,
+      o: q.bonus_options ? correctFirst(q.bonus_options, 0) : opts,
     },
   };
 }
