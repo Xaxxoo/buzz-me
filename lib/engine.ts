@@ -618,16 +618,21 @@ export class GameEngine {
   }
 
   private advance() {
-    if (this.pendingRound) {
-      this.pendingRound.took = this.state.took[this.state.qi] ?? 'none';
-      this.pendingRound.bonus = this.pendingBonus ? {
-        questionText: this.pendingBonus.questionText, options: this.pendingBonus.options,
-        correctAnswer: this.pendingBonus.correctAnswer, forTeam: this.pendingBonus.forTeam,
-        yourPick: this.pendingBonus.yourPick, correct: this.pendingBonus.correct,
-      } : null;
-      this.set({ reviewRounds: [...this.state.reviewRounds, this.pendingRound as ReviewRound] });
-      this.pendingRound = null; this.pendingBonus = null;
-    }
+    try {
+      if (this.pendingRound) {
+        this.pendingRound.took = this.state.took[this.state.qi] ?? 'none';
+        this.pendingRound.bonus = this.pendingBonus ? {
+          questionText: this.pendingBonus.questionText ?? '',
+          options: this.pendingBonus.options ?? [],
+          correctAnswer: this.pendingBonus.correctAnswer ?? '',
+          forTeam: this.pendingBonus.forTeam ?? 'you',
+          yourPick: this.pendingBonus.yourPick ?? null,
+          correct: this.pendingBonus.correct ?? null,
+        } : null;
+        this.set({ reviewRounds: [...this.state.reviewRounds, this.pendingRound as ReviewRound] });
+        this.pendingRound = null; this.pendingBonus = null;
+      }
+    } catch { this.pendingRound = null; this.pendingBonus = null; }
     this.set({ qi: this.state.qi + 1 }); this.nextQuestion();
   }
 
@@ -1095,16 +1100,21 @@ export class GameEngine {
     this.set({ scoreYou: myScore, scoreRival: theirScore });
     const t = data.took === this.mySide ? 'you' as const : data.took === 'none' ? 'none' as const : 'rival' as const;
     this.took(t);
-    if (this.pendingRound) {
-      this.pendingRound.took = t;
-      this.pendingRound.bonus = this.pendingBonus ? {
-        questionText: this.pendingBonus.questionText, options: this.pendingBonus.options,
-        correctAnswer: this.pendingBonus.correctAnswer, forTeam: this.pendingBonus.forTeam,
-        yourPick: this.pendingBonus.yourPick, correct: this.pendingBonus.correct,
-      } : null;
-      this.set({ reviewRounds: [...this.state.reviewRounds, this.pendingRound as ReviewRound] });
-      this.pendingRound = null; this.pendingBonus = null;
-    }
+    try {
+      if (this.pendingRound) {
+        this.pendingRound.took = t;
+        this.pendingRound.bonus = this.pendingBonus ? {
+          questionText: this.pendingBonus.questionText ?? '',
+          options: this.pendingBonus.options ?? [],
+          correctAnswer: this.pendingBonus.correctAnswer ?? '',
+          forTeam: this.pendingBonus.forTeam ?? 'you',
+          yourPick: this.pendingBonus.yourPick ?? null,
+          correct: this.pendingBonus.correct ?? null,
+        } : null;
+        this.set({ reviewRounds: [...this.state.reviewRounds, this.pendingRound as ReviewRound] });
+        this.pendingRound = null; this.pendingBonus = null;
+      }
+    } catch { this.pendingRound = null; this.pendingBonus = null; }
   }
 
   onlineMatchEnd(data: { match_id: string; score_a: number; score_b: number; rating_before: number; rating_after: number; rating_delta: number; rounds_won: number; total_rounds: number }) {
